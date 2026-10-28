@@ -1,0 +1,15 @@
+# Dashboard UI and development contract
+
+The existing authenticated admin home renders the dashboard. All original JWT, tenant membership, revocation and permission checks remain active. No demo authentication bypass was added.
+
+The dashboard uses the explicit development adapter in `src/features/dashboard/adapter.ts`, not invented backend endpoints. Each panel has its own tenant-scoped TanStack Query key and abort signal. Summary values and recent activity are deterministic September 2026 fixtures; session responses return `{ rows, total }` after filtering and slicing with a six-row page size. Money is integer paise. Replace the adapter with authenticated, tenant-scoped backend contracts before production. Repeated session names represent synthetic data.
+
+URL state: `page` and `status` control session requests. `demoState=loading|empty|error` exercises panel geometry and failure states; `failPanel=summary|alerts|activity|sessions` exercises partial failures. Retry reissues the same request; remove the failure parameter to restore responses. Summary CSV contains exactly the four displayed demo metrics and their details, not a financial ledger. Export is disabled when summary data is unavailable.
+
+Header search searches configured navigation only. Notifications explain that the backend feed is not connected. Account and logout use the existing account route and CSRF-protected logout API. Additional navigation destinations render explicit integration extension screens under the original protected admin layout. Alert links require matching read permissions and carry their queue in `filter`; no moderation capability is implied.
+
+Brand and grouped admin navigation live in `lib/auth/portal-config.ts`. Shared semantic light/dark tokens and responsive dimensions live in `app/globals.css`. Sidebar collapses to an icon rail on desktop and overlays content on mobile with Escape dismissal, focus containment and focus restoration. Existing provider/consumer shells and authentication pages inherit the same tokens; live sessions retain their minimal shell.
+
+Visual differences: the discoverable sidebar toggle, theme control and development-data notice add small elements absent from the reference. Account identity is generic rather than claiming the screenshot's sample administrator. Pending domain workflows remain explicitly unavailable. Visual browser verification requires a backend-authorized account with signed tenant membership; this starter deliberately denies tenant portal access without it.
+
+Validation: TypeScript passed; 14 tests across four suites passed, including dashboard pagination, abort and unavailable-summary cases. Faculty is a deterministic query-backed directory with URL status/category filters. Only seven fixture profiles are supplied; counts describe those fixtures rather than claiming 118 real records. Invitation and verification mutations are unavailable. No authenticated browser screenshots or responsive visual acceptance checks were performed.

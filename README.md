@@ -1,29 +1,31 @@
-# README #
+# Multi-portal frontend starter
 
-This README would normally document whatever steps are necessary to get your application up and running.
+Next.js App Router baseline aligned with the adjacent Express RBAC service. Read [backend findings](BACKEND_ANALYSIS.md), [architecture and directory blueprint](AGENT_GUIDE.md), and [copy-paste prompts](PROMPT_TEMPLATES.md).
 
-### What is this repository for? ###
+## Run
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+```powershell
+cd frontend
+npm ci
+Copy-Item .env.example .env.local
+# Set JWT_SECRET to exactly match the backend access-token secret (32+ characters).
+npm run dev
+```
 
-### How do I get set up? ###
+Frontend runs on http://localhost:3001; backend defaults to http://127.0.0.1:3000. The Next /api/v1 rewrite keeps cookies same-origin. Restart after changing gateway configuration. Never expose secrets with NEXT_PUBLIC_.
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+```powershell
+npm run typecheck
+npm test
+npm run build
+```
 
-### Contribution guidelines ###
+The landing page and auth pages render immediately. Backend integration requires a running PostgreSQL/Redis service and backend startup fixes described in BACKEND_ANALYSIS.md. Tenant portals intentionally deny access until the backend adds signed tenantIds membership claims and tenant resource authorization. Password auth exists; OTP, guardian consent and marketplace operations are explicit extension screens.
 
-* Writing tests
-* Code review
-* Other guidelines
+The scaffold generator is retained as scaffold.cjs for traceability. It was used once to create route skeletons; do not rerun it over customized pages because it overwrites generated files.
 
-### Who do I talk to? ###
+Next 15 was selected to implement the requested Edge middleware.ts convention. Official references: [Next 15 middleware](https://nextjs.org/docs/15/app/getting-started/route-handlers-and-middleware), [route groups](https://nextjs.org/docs/15/app/api-reference/file-conventions/route-groups). This is a high-level baseline, with deployment/integration work called out in the architecture guide.
 
-* Repo owner or admin
-* Other community or team contact
+## Reference dashboard UI
+
+The shared shell and admin dashboard now use the Amentorz visual system. See [UI implementation and adapter contract](UI_IMPLEMENTATION.md) for fixtures, URL filters, state testing, theme configuration and integration limitations.

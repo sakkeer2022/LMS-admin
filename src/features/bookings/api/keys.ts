@@ -1,0 +1,1 @@
+export const bookingsKeys = { all: (tenantId: string) => ['bookings', tenantId] as const, list: (tenantId: string, filters: Record<string, string>) => ['bookings', tenantId, 'list', filters] as const };
