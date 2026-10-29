@@ -20,7 +20,7 @@ async function main() {
     }
     await page.goto(`${base}/admin/dev-admin/dashboard`);
     await page.waitForURL('**/login');
-    await page.getByText(/Development login · Username: admin/).waitFor();
+    await page.getByText(/Offline UI preview only/).waitFor();
     await page.getByLabel('Email or development username').fill('admin');
     await page.locator('input[name="password"]').fill('wrong');
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();

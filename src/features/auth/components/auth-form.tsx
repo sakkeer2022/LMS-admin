@@ -36,7 +36,8 @@ export function AuthForm({ register = false }: { register?: boolean }) {
 
     const values = Object.fromEntries(new FormData(event.currentTarget));
 
-    if (developmentLogin && (values.email === 'admin' || values.password === 'Admin@123' || !String(values.email).includes('@'))) {
+    // The offline preview takes only the bare username; any email goes to the real backend login
+    if (developmentLogin && !String(values.email).includes('@')) {
       try {
         if (!loginDevAdmin(String(values.email), String(values.password))) {
           setError('Invalid development username or password.');
@@ -103,7 +104,8 @@ export function AuthForm({ register = false }: { register?: boolean }) {
       </Typography>
       {developmentLogin && (
         <Typography tone="muted">
-          Development login · Username: admin · Password: Admin@123
+          Sign in with your account email for live data. Offline UI preview only (no backend
+          data): username admin, password Admin@123.
         </Typography>
       )}
       <Form
