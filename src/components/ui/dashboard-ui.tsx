@@ -95,15 +95,15 @@ export function StatCard({
   );
 }
 export function StatusBadge({ status }: { status: string }) {
-  const tone = ["Completed", "Verified"].includes(status)
+  const tone = ["Completed", "Verified", "Active"].includes(status)
     ? "success"
     : ["Confirmed"].includes(status)
       ? "info"
-      : ["Cancelled", "Suspended"].includes(status)
+      : ["Cancelled", "Suspended", "Archived"].includes(status)
         ? "danger"
         : ["In progress", "Published"].includes(status)
           ? "accent"
-          : status === "Pending"
+          : ["Pending", "Draft"].includes(status)
             ? "warning"
             : "neutral";
   return (
@@ -118,7 +118,8 @@ export function DataTable({
   children,
   caption,
 }: {
-  headers: string[];
+  // Strings, or elements such as a select-all checkbox
+  headers: ReactNode[];
   children: ReactNode;
   caption: string;
 }) {
@@ -128,8 +129,8 @@ export function DataTable({
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr>
-            {headers.map((h) => (
-              <th key={h} style={{textAlign:"left"}}>
+            {headers.map((h, i) => (
+              <th key={typeof h === "string" ? h : i} style={{textAlign:"left"}}>
                 {h}
               </th>
             ))}

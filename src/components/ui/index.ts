@@ -19,3 +19,7 @@ export * from './Textarea';
 export * from './TextField';
 export * from './Typography';
 export * from './utils';
+export * from './ConfirmDialog';
+export * from './Drawer';
+export * from './Menu';
+export * from './TreeAccordion';

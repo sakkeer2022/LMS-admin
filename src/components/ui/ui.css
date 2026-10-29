@@ -524,6 +524,10 @@
 .ui-modal::backdrop {
   background: rgb(0 0 0 / 0.45);
 }
+/* The global "* { margin: 0 }" reset removes the dialog's default centring */
+.ui-modal--center {
+  margin: auto;
+}
 .ui-modal-header {
   display: flex;
   align-items: center;
@@ -624,4 +628,121 @@ select {
 }
 .ui-card--stat strong {
   line-height: var(--line-heading);
+}
+
+/* Drawer (Modal placement="right") */
+.ui-modal--right:has(.ui-drawer-body),
+.ui-modal--left:has(.ui-drawer-body) {
+  display: flex;
+  flex-direction: column;
+  width: min(460px, 100vw);
+}
+.ui-modal[open]:has(.ui-drawer-body) {
+  display: flex;
+}
+.ui-drawer-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ui-drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 16px;
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  position: sticky;
+  bottom: -24px;
+  background: var(--surface);
+  padding-bottom: 4px;
+}
+
+/* ConfirmDialog */
+.ui-confirm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ui-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+/* Menu */
+.ui-menu {
+  position: relative;
+  display: inline-flex;
+}
+.ui-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+.ui-menu-item {
+  justify-content: flex-start;
+  width: 100%;
+}
+.ui-menu-item--danger {
+  color: var(--danger);
+}
+
+/* TreeAccordion */
+.ui-tree,
+.ui-tree [role="group"] {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ui-tree-item {
+  outline: none;
+}
+.ui-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding-inline-end: 4px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.ui-tree-row:hover {
+  background: var(--subtle);
+}
+.ui-tree-row--selected {
+  background: var(--accent-soft);
+}
+.ui-tree-item:focus-visible > .ui-tree-row {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.ui-tree-toggle,
+.ui-tree-spacer {
+  flex: 0 0 28px;
+  width: 28px;
+}
+.ui-tree-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ui-tree-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
