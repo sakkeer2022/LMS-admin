@@ -102,7 +102,7 @@ export function PriceRuleDrawer({ tenant, rule, offerings, onClose }: {
           {preview
             ? <>
                 <Typography variant="body2">GST {formatPaise(preview.gstPaise)} (CGST {formatPaise(preview.cgstPaise)} + SGST {formatPaise(preview.sgstPaise)})</Typography>
-                <Typography variant="body1">Student pays <strong>{formatPaise(preview.studentPaysPaise)}</strong></Typography>
+                <Typography variant="subtitle1">Student pays {formatPaise(preview.studentPaysPaise)}</Typography>
               </>
             : <Typography variant="body2" tone="muted">Enter a session price to see GST and the student total.</Typography>}
         </div>

@@ -141,7 +141,7 @@ export function PricingPage({ tenant }: { tenant: string }) {
         </SelectField>
       </div>
       {rules.isPending ? <PanelSkeleton rows={6} />
-        : rules.isError ? <PanelMessage onRetry={() => void rules.refetch()}>Price rules could not be loaded.</PanelMessage>
+        : rules.isError ? <PanelMessage onRetry={() => void rules.refetch()}>Price rules could not be loaded. {describeApiError(rules.error, 'view pricing').message}</PanelMessage>
         : rows.length === 0 ? <div className="flex flex-col items-start gap-3 py-6">
             <Typography>{filters.q || filters.categoryId || filters.subjectId ? 'No price rules match these filters.' : 'No price rules yet.'}</Typography>
             {canManage && <Button variant="primary" onClick={() => setDrawer({})} disabled={!offerings.length}>Add price rule</Button>}
