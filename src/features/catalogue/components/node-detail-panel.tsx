@@ -4,6 +4,7 @@ import { PanelMessage, PanelSkeleton, StatusBadge } from '@/components/ui/dashbo
 import type { NodeDetail } from '@/lib/api/catalogue';
 import { typeLabel } from '@/lib/api/catalogue-tree';
 import { formatPaise } from '@/lib/currency/money';
+import { describeApiError } from '@/lib/api/errors';
 
 export const statusLabel = (status: NodeDetail['status']) => status.charAt(0) + status.slice(1).toLowerCase();
 
@@ -60,12 +61,12 @@ export function NodeDetailView({ node, pricingHref, actions }: { node: NodeDetai
 }
 
 export function NodeDetailPanel({ query, pricingHref, actions }: {
-  query: { isPending: boolean; isError: boolean; data?: NodeDetail; refetch: () => unknown } | null;
+  query: { isPending: boolean; isError: boolean; error?: unknown; data?: NodeDetail; refetch: () => unknown } | null;
   pricingHref: string;
   actions: NodeDetailActions;
 }) {
   if (!query) return <Card className="p-5"><Typography tone="muted">Select a node to see its details.</Typography></Card>;
   if (query.isPending) return <Card className="p-5"><PanelSkeleton rows={5} /></Card>;
-  if (query.isError || !query.data) return <Card className="p-5"><PanelMessage onRetry={() => query.refetch()}>The node could not be loaded.</PanelMessage></Card>;
+  if (query.isError || !query.data) return <Card className="p-5"><PanelMessage onRetry={() => query.refetch()}>The node could not be loaded. {describeApiError(query.error, 'view the catalogue').message}</PanelMessage></Card>;
   return <NodeDetailView node={query.data} pricingHref={pricingHref} actions={actions} />;
 }

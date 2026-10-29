@@ -4,6 +4,7 @@ import { BookOpen, FolderTree, GraduationCap, Landmark, Layers } from 'lucide-re
 import { Button, Card, Checkbox, Label, Menu, Tabs, TextField, TreeAccordion, Typography, expandableIds, type MenuItem } from '@/components/ui';
 import { PageHeader, PanelMessage, PanelSkeleton, StatusBadge } from '@/components/ui/dashboard-ui';
 import { usePermission } from '@/components/security/permission-provider';
+import { describeApiError } from '@/lib/api/errors';
 import { useCatalogueNode, useCatalogueTrees, useCategories, type NodeDetail, type NodeType, type TreeNode } from '@/lib/api/catalogue';
 import { addPathPrefill, catalogueTotals, childCountLabel, findNode, nodeActions, withoutArchived } from '@/lib/api/catalogue-tree';
 import { CatalogueDrawer, type DrawerState } from './catalogue-drawer';
@@ -100,7 +101,9 @@ export function CataloguePage({ tenant }: { tenant: string }) {
       <Button size="sm" variant="ghost" onClick={() => setExpanded(new Set())}>Collapse all</Button>
     </div>
     {loading ? <PanelSkeleton rows={8} />
-      : failed ? <PanelMessage onRetry={() => { void categories.refetch(); trees.forEach((t) => void t.refetch()); }}>The catalogue could not be loaded.</PanelMessage>
+      : failed ? <PanelMessage onRetry={() => { void categories.refetch(); trees.forEach((t) => void t.refetch()); }}>
+          The catalogue could not be loaded. {describeApiError(categories.error ?? trees.find((t) => t.error)?.error, 'view the catalogue').message}
+        </PanelMessage>
       : roots.every((r) => r.childCount === 0) ? <div className="flex flex-col items-start gap-3 py-6">
           <Typography>{q ? `Nothing matches “${q}”.` : 'The catalogue has no paths yet.'}</Typography>
           {canManage && !q && <Button variant="primary" onClick={() => setDrawer({ mode: 'add' })}>Add category</Button>}
@@ -112,7 +115,7 @@ export function CataloguePage({ tenant }: { tenant: string }) {
               const Icon = icons[node.type];
               return <>
                 <Icon size={16} aria-hidden="true" className="shrink-0 text-[var(--muted)]" />
-                <Typography component="span" variant="body2" className={node.type === 'CATEGORY' ? 'font-semibold' : undefined}>{node.name}</Typography>
+                <Typography component="span" variant={node.type === 'CATEGORY' ? 'subtitle2' : 'body2'}>{node.name}</Typography>
                 {node.children.length > 0 && <Typography variant="caption" tone="muted">{childCountLabel(node)}</Typography>}
                 {node.status !== 'PUBLISHED' && <StatusBadge status={statusLabel(node.status)} />}
               </>;
