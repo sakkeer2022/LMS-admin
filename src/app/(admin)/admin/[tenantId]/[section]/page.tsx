@@ -3,7 +3,6 @@ import { ExtensionPanel } from "@/components/ui/extension-panel";
 import { FacultyDirectory } from "@/features/dashboard/faculty-directory";
 const sections: Record<string, string> = {
   faculty: "Faculty",
-  pricing: "Pricing",
   bookings: "Bookings",
   reviews: "Reviews",
   progress: "Progress Reports",
