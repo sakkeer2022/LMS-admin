@@ -4,8 +4,9 @@ import { BookOpen, FolderTree, GraduationCap, Landmark, Layers } from 'lucide-re
 import { Button, Card, Checkbox, Label, Menu, Tabs, TextField, TreeAccordion, Typography, expandableIds, type MenuItem } from '@/components/ui';
 import { PageHeader, PanelMessage, PanelSkeleton, StatusBadge } from '@/components/ui/dashboard-ui';
 import { usePermission } from '@/components/security/permission-provider';
-import { useCatalogueNode, useCatalogueTrees, useCategories, type NodeType, type TreeNode } from '@/lib/api/catalogue';
-import { catalogueTotals, childCountLabel, findNode, nodeActions, withoutArchived } from '@/lib/api/catalogue-tree';
+import { useCatalogueNode, useCatalogueTrees, useCategories, type NodeDetail, type NodeType, type TreeNode } from '@/lib/api/catalogue';
+import { addPathPrefill, catalogueTotals, childCountLabel, findNode, nodeActions, withoutArchived } from '@/lib/api/catalogue-tree';
+import { CatalogueDrawer, type DrawerState } from './catalogue-drawer';
 import { NodeDetailPanel, statusLabel } from './node-detail-panel';
 import { ArchiveDialog, MoveDialog, ReorderPanel } from './node-dialogs';
 
@@ -28,6 +29,7 @@ export function CataloguePage({ tenant }: { tenant: string }) {
   const [showArchived, setShowArchived] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string>();
+  const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [reordering, setReordering] = useState(false);
 
@@ -55,9 +57,16 @@ export function CataloguePage({ tenant }: { tenant: string }) {
     if (selectedId) document.querySelector(`[data-tree-id="${CSS.escape(selectedId)}"]`)?.scrollIntoView({ block: 'nearest' });
   }, [selectedId, rootKey]);
 
+  const onCreated = (leaf: NodeDetail) => {
+    setExpanded((current) => new Set([...current, ...leaf.path.map((p) => p.id)]));
+    setSelectedId(leaf.id);
+  };
+
   const actionsFor = (node: TreeNode) => {
     const allowed = nodeActions(node);
     return {
+      onAddChild: canManage && allowed.addChild ? () => setDrawer({ mode: 'add', prefill: addPathPrefill(rawRoots, node) }) : undefined,
+      onEdit: canManage && allowed.edit ? () => setDrawer({ mode: 'edit', node }) : undefined,
       onMove: canManage && allowed.move ? () => setDialog({ kind: 'move', node }) : undefined,
       onArchive: canManage && allowed.archive ? () => setDialog({ kind: 'archive', node }) : undefined,
     };
@@ -65,6 +74,8 @@ export function CataloguePage({ tenant }: { tenant: string }) {
   const menuFor = (node: TreeNode): MenuItem[] => {
     const a = actionsFor(node);
     return [
+      a.onAddChild && { id: 'add', label: 'Add child', onSelect: a.onAddChild },
+      a.onEdit && { id: 'edit', label: 'Edit', onSelect: a.onEdit },
       a.onMove && { id: 'move', label: 'Move', onSelect: a.onMove },
       a.onArchive && { id: 'archive', label: 'Archive', onSelect: a.onArchive, destructive: true },
     ].filter((item): item is MenuItem => Boolean(item));
@@ -92,6 +103,7 @@ export function CataloguePage({ tenant }: { tenant: string }) {
       : failed ? <PanelMessage onRetry={() => { void categories.refetch(); trees.forEach((t) => void t.refetch()); }}>The catalogue could not be loaded.</PanelMessage>
       : roots.every((r) => r.childCount === 0) ? <div className="flex flex-col items-start gap-3 py-6">
           <Typography>{q ? `Nothing matches “${q}”.` : 'The catalogue has no paths yet.'}</Typography>
+          {canManage && !q && <Button variant="primary" onClick={() => setDrawer({ mode: 'add' })}>Add category</Button>}
         </div>
       : <div className="max-h-[70vh] overflow-auto">
           <TreeAccordion label="Catalogue tree" roots={roots} expanded={expanded} onExpandedChange={setExpanded}
@@ -119,12 +131,15 @@ export function CataloguePage({ tenant }: { tenant: string }) {
         title={reorderParent ? `Reorder the children of ${reorderParent.name}` : 'Select a node below a category to reorder its siblings'}>
         {reordering ? 'Close reorder' : 'Reorder'}
       </Button>
+      <Button variant="primary" onClick={() => setDrawer({ mode: 'add' })}>Add category</Button>
     </div>} />
     <Tabs label="Catalogue sections" items={[{ id: 'tree', label: 'Catalogue tree', content:
       <div className="grid gap-4 pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
         {treePanel}
         <div className="min-w-0">{sidePanel}</div>
       </div> }]} />
+    {drawer && categories.data && <CatalogueDrawer key={drawer.mode === 'edit' ? drawer.node.id : 'add'} tenant={tenant} state={drawer} roots={rawRoots}
+      categories={categories.data} onClose={() => setDrawer(null)} onCreated={onCreated} />}
     {dialog?.kind === 'move' && rootOf(dialog.node) && <MoveDialog tenant={tenant} node={dialog.node} root={rootOf(dialog.node)!}
       requiresBoard={Boolean(categoryOf(dialog.node)?.requiresBoard)} onClose={() => setDialog(null)} />}
     {dialog?.kind === 'archive' && <ArchiveDialog tenant={tenant} node={dialog.node} onClose={() => setDialog(null)} />}
