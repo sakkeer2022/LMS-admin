@@ -14,6 +14,18 @@ export const portals = {
 export type Portal = keyof typeof portals;
 export function portalAllowed(claims: Claims, portal: Portal) { return portals[portal].roles.some(role => claims.roles.includes(role)); }
 export function homeFor(claims: Claims) { return (['admin', 'faculty', 'student'] as const).find(p => portalAllowed(claims, p)); }
+/**
+ * Tenants the signed claims grant. The backend has no tenant model yet and issues no
+ * tenantIds claim, so a single-tenant deployment names its one tenant in the server-only
+ * SINGLE_TENANT_ID. A token that does carry tenantIds is always checked against it alone.
+ */
+export function grantedTenants(claims: Claims, singleTenant = process.env.SINGLE_TENANT_ID) {
+  if (claims.tenantIds) return claims.tenantIds;
+  return singleTenant ? [singleTenant] : [];
+}
+export function tenantAllowed(claims: Claims, tenant: string, singleTenant?: string) {
+  return grantedTenants(claims, singleTenant).includes(tenant);
+}
 export function hasPermission(grants: string[], required: string) {
   return grants.some(grant => {
     if (grant === '*' || grant === 'admin.*' || grant === required) return true;
