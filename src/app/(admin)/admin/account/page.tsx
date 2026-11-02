@@ -13,13 +13,9 @@ export default function Account() {
         <Typography role="alert">Please sign in again.</Typography>
       ) : (
         <Typography>
-          {me.data.data.firstName} · {me.data.data.email}
+          {me.data.data.fullName} · {me.data.data.email}
         </Typography>
       )}
-      <Typography>
-        Use an administrator-provided tenant portal link. Portal roles and
-        tenant membership are provisioned by your backend.
-      </Typography>
       <Button
         onClick={() => logout.mutate()}
         pending={logout.isPending}

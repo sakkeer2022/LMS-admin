@@ -8,27 +8,15 @@ import {
 } from "@/components/ui";
 import { Link } from "@/components/ui/Link";
 import { api } from "@/lib/api/client";
-import { hasDevAdminSession, logoutDevAdmin } from "@/lib/auth/dev-admin";
-import { portals, type Portal } from "@/lib/auth/access";
-import { adminNavigation, portalBrand } from "@/lib/auth/portal-config";
+import { adminNavigation, portalBrand, portalTitle } from "@/lib/auth/portal-config";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
-  CalendarDays,
-  FileText,
-  Folder,
-  IndianRupee,
-  LayoutDashboard,
   LogOut,
   Menu,
   Moon,
   Search,
-  Settings,
-  Star,
   Sun,
-  UserCheck,
-  Users,
-  Wallet,
   X,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -36,31 +24,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AdminHeader } from "./admin/AdminHeader";
 import { AdminPageContainer } from "./admin/AdminPageContainer";
 import { AdminSidebar } from "./admin/AdminSidebar";
-import { isNavigationActive } from "./admin/navigation";
-const icons = {
-  dashboard: LayoutDashboard,
-  users: Users,
-  faculty: UserCheck,
-  folder: Folder,
-  money: IndianRupee,
-  calendar: CalendarDays,
-  star: Star,
-  file: FileText,
-  wallet: Wallet,
-  settings: Settings,
-};
-export function PortalShell({
-  portal,
-  tenant,
-  children,
-}: {
-  portal: Portal;
-  tenant: string;
-  children: ReactNode;
-}) {
+export function PortalShell({ children }: { children: ReactNode }) {
   const pathname = usePathname(),
    client = useQueryClient();
-  const base = `/${portal}/${encodeURIComponent(tenant)}`;
+  const base = "/admin";
   const [collapsed, setCollapsed] = useState(false),
     [mobile, setMobile] = useState(false),
     [search, setSearch] = useState(""),
@@ -69,19 +36,7 @@ export function PortalShell({
     [error, setError] = useState("");
   const toggle = useRef<HTMLButtonElement>(null),
     aside = useRef<HTMLElement>(null);
-  const groups =
-    portal === "admin"
-      ? adminNavigation
-      : [
-          {
-            label: portals[portal].title,
-            items: portals[portal].links.map(([title, suffix]) => [
-              title,
-              suffix,
-              "dashboard",
-            ]),
-          },
-        ];
+  const groups = adminNavigation;
   useEffect(() => {
     const saved = localStorage.getItem("amentorz-theme") === "dark";
     setDark(saved);
@@ -131,8 +86,7 @@ export function PortalShell({
   async function logout() {
     setLoggingOut(true);
     try {
-      if (hasDevAdminSession()) logoutDevAdmin();
-      else await api("/auth/logout", { method: "POST" });
+      await api("/auth/logout", { method: "POST" });
       client.clear();
       window.location.assign("/login");
     } catch {
@@ -179,60 +133,19 @@ export function PortalShell({
         >
           <X size={18} />
         </Button>
-        {portal === "admin" ? (
-          <AdminSidebar
-            base={base}
-            onNavigate={() => {
-              setMobile(false);
-            }}
-          />
-        ) : (
-          <nav aria-label={`${portal} navigation`}>
-            {groups.map((group) => (
-              <div className="sidebar-group" key={group.label}>
-                <Typography
-                  variant="caption"
-                  component="p"
-                  tone="muted"
-                  className="group-label"
-                >
-                  {group.label}
-                </Typography>
-                {group.items.map(([title, suffix, icon]) => {
-                  const Icon = icons[icon as keyof typeof icons] ?? FileText;
-                  return (
-                    <Link
-                      title={title}
-                      className="nav-item"
-                      aria-current={
-                        (
-                          suffix
-                            ? isNavigationActive(pathname, base + suffix)
-                            : pathname === base
-                        )
-                          ? "page"
-                          : undefined
-                      }
-                      href={base + suffix}
-                      key={title}
-                      onClick={() => setMobile(false)}
-                    >
-                      <Icon size={18} />
-                      <span>{title}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
-          </nav>
-        )}
+        <AdminSidebar
+          base={base}
+          onNavigate={() => {
+            setMobile(false);
+          }}
+        />
         <div className="sidebar-account">
-          <Link href="/account" className="account-link">
+          <Link href="/admin/account" className="account-link">
             <span className="avatar">AC</span>
             <span>
               My account
               <Typography variant="inherit" component="small" tone="muted">
-                {portals[portal].title}
+                {portalTitle}
               </Typography>
             </span>
           </Link>
@@ -266,7 +179,6 @@ export function PortalShell({
           >
             <Menu size={18} />
           </Button>
-          {/* {portal === "admin" && <AdminHeader base={base} />} */}
           <div className="navigation-search">
             {/* <Search size={15} /> */}
             <TextField
@@ -345,7 +257,7 @@ export function PortalShell({
               summary={<span className="avatar">AC</span>}
             >
               <div className="popover">
-                <Link href="/account">Account & sessions</Link>
+                <Link href="/admin/account">Account & sessions</Link>
                 <Button
                   pending={loggingOut}
                   pendingLabel="Signing out…"
@@ -358,11 +270,7 @@ export function PortalShell({
           </div>
         </header>
         <FormError message={error} />
-        {portal === "admin" ? (
-          <AdminPageContainer>{children}</AdminPageContainer>
-        ) : (
-          <main id="main">{children}</main>
-        )}
+        <AdminPageContainer>{children}</AdminPageContainer>
       </div>
     </div>
   );

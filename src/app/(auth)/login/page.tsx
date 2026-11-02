@@ -4,7 +4,6 @@ export default function Login() {
   return (
     <>
       <AuthForm />
-      <Link href="/register">Create account</Link> ·{" "}
       <Link href="/recovery">Recover access</Link>
     </>
   );

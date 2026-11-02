@@ -1,1 +1,0 @@
-export const earningsKeys = { all: (tenantId: string) => ['earnings', tenantId] as const, list: (tenantId: string, filters: Record<string, string>) => ['earnings', tenantId, 'list', filters] as const };

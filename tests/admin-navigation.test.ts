@@ -7,13 +7,13 @@ describe('admin navigation', () => {
     expect(items).toHaveLength(11);
     expect(new Set(items.map(item => item[1])).size).toBe(11);
     for (const [title, suffix] of items) {
-      expect(adminPageTitle(`/admin/acme${suffix}`, '/admin/acme')).toBe(title);
-      expect(adminPageTitle(`/admin/acme${suffix}/record-id`, '/admin/acme')).toBe(title);
+      expect(adminPageTitle(`/admin${suffix}`, '/admin')).toBe(title);
+      expect(adminPageTitle(`/admin${suffix}/record-id`, '/admin')).toBe(title);
     }
   });
   it('matches detail paths without matching similarly named siblings', () => {
-    expect(isNavigationActive('/admin/acme/users/123', '/admin/acme/users')).toBe(true);
-    expect(isNavigationActive('/admin/acme/users-other', '/admin/acme/users')).toBe(false);
-    expect(adminPageTitle('/admin/acme/unknown', '/admin/acme')).toBe('Page not found');
+    expect(isNavigationActive('/admin/users/123', '/admin/users')).toBe(true);
+    expect(isNavigationActive('/admin/users-other', '/admin/users')).toBe(false);
+    expect(adminPageTitle('/admin/unknown', '/admin')).toBe('Page not found');
   });
 });

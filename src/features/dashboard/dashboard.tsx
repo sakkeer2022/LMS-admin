@@ -2,7 +2,7 @@
 import { SelectField } from "@/components/ui";
 import { Button, Card, Typography } from "@/components/ui";
 import { Link } from '@/components/ui/Link';
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ShieldCheck,
@@ -57,7 +57,6 @@ function AlertDestination({
   );
 }
 export function Dashboard() {
-  const { tenantId } = useParams<{ tenantId: string }>();
   const search = useSearchParams();
   const router = useRouter();
   const state = (
@@ -68,28 +67,24 @@ export function Dashboard() {
   const page = Math.max(1, Number(search.get("page")) || 1),
     status = search.get("status") ?? "";
   const stats = useDashboard(
-    tenantId,
     "summary",
     1,
     "",
     search.get("failPanel") === "summary" ? "error" : state,
   );
   const alerts = useDashboard(
-    tenantId,
     "alerts",
     1,
     "",
     search.get("failPanel") === "alerts" ? "error" : state,
   );
   const activity = useDashboard(
-    tenantId,
     "activity",
     1,
     "",
     search.get("failPanel") === "activity" ? "error" : state,
   );
   const table = useDashboard(
-    tenantId,
     "sessions",
     page,
     status,
@@ -172,7 +167,7 @@ export function Dashboard() {
                   <AlertDestination
                     key={a.title}
                     permission={a.permission}
-                    href={`/admin/${encodeURIComponent(tenantId)}/${a.destination}?filter=${a.filter}`}
+                    href={`/admin/${a.destination}?filter=${a.filter}`}
                   >
                     <Icon className={a.severity} size={17} />
                     <div>

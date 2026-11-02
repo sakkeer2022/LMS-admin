@@ -5,8 +5,8 @@ export default function Denied() {
     <main id="main">
       <Typography variant="h1">Access unavailable</Typography>
       <Typography>
-        Your account needs a portal role and verified tenant membership. Contact
-        your administrator.
+        This portal is for administrators. Your account does not have the admin
+        role. Contact your administrator.
       </Typography>
       <Link href="/login">Return to sign in</Link>
     </main>

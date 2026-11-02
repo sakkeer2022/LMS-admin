@@ -10,14 +10,14 @@ const { chromium } = require(
   process.env.PLAYWRIGHT_MODULE_PATH || "playwright",
 );
 const root = path.resolve(__dirname, "../..");
-const secret = "browser-test-only-secret-at-least-32-characters";
 const profile = {
   id: "test-user",
   email: "person@example.test",
-  firstName: "Person",
-  lastName: "Test",
+  fullName: "Person Test",
+  mobileNumber: null,
   isActive: true,
-  roles: [],
+  emailVerified: true,
+  roles: [{ id: "role-admin", name: "admin", permissions: [{ name: "*" }] }],
 };
 const envelope = (data) => ({ success: true, message: "OK", data });
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -52,7 +52,6 @@ async function main() {
         cwd: root,
         env: {
           ...process.env,
-          JWT_SECRET: secret,
           BACKEND_ORIGIN: `http://127.0.0.1:${backendPort}`,
         },
         stdio: ["ignore", "pipe", "pipe"],
@@ -98,7 +97,12 @@ async function main() {
       const pathname = new URL(request.url()).pathname;
       if (pathname.endsWith("/csrf-token"))
         return route.fulfill({ json: envelope({ csrfToken: "test-csrf" }) });
-      if (pathname.endsWith("/login") || pathname.endsWith("/register")) {
+      if (pathname.endsWith("/refresh"))
+        return route.fulfill({
+          status: 401,
+          json: { success: false, message: "Refresh token is required" },
+        });
+      if (pathname.endsWith("/login")) {
         attempts++;
         received = request.postDataJSON();
         assert.equal(request.headers()["x-csrf-token"], "test-csrf");
@@ -180,56 +184,28 @@ async function main() {
       fullPage: true,
     });
     mode = "success";
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await page.waitForURL(`${origin}/account`); // unsafe redirect remains rejected
-    await page.getByText("Person · person@example.test").waitFor();
-    await page.goto(`${origin}/register`);
-    await page.getByLabel(/^First name/).fill(" Person ");
-    await page.getByLabel(/^Last name/).fill(" Test ");
-    await page.getByLabel(/^Email/).fill("Person@Example.test");
-    await page.getByLabel(/^Password/).fill("short");
-    const before = attempts;
-    await page.getByRole("button", { name: "Register", exact: true }).click();
-    await page.getByText("Please correct the highlighted fields.").waitFor();
-    assert.equal(attempts, before);
-    const password = page.getByLabel(/^Password/);
-    assert.equal(await password.getAttribute("aria-invalid"), "true");
-    const descriptions = (
-      await password.getAttribute("aria-describedby")
-    ).split(" ");
-    assert.equal(descriptions.length, 2);
-    await password.fill("LongEnough1!");
-    await page.getByRole("button", { name: "Register", exact: true }).click();
-    await page.waitForURL(`${origin}/account`);
-    assert.equal(received.firstName, "Person");
-    assert.equal(received.email, "person@example.test");
-    await page.goto(`${origin}/recovery`);
-    await page.getByRole("heading", { name: "Password recovery" }).waitFor();
-    assert.equal(await page.locator("form").count(), 0);
-
-    const { SignJWT } = await import("jose");
-    const token = await new SignJWT({
-      email: profile.email,
-      roles: ["admin"],
-      permissions: ["*"],
-      tenantIds: ["acme"],
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setSubject(profile.id)
-      .setExpirationTime("5m")
-      .sign(new TextEncoder().encode(secret));
+    // The mocked login sets no cookie, so give the browser the access cookie the edge gate needs
     await context.addCookies([
       {
         name: "accessToken",
-        value: token,
+        value: "browser-test-token",
         url: origin,
         httpOnly: true,
         sameSite: "Strict",
       },
     ]);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.waitForURL(`${origin}/admin/dashboard`); // unsafe redirect remains rejected
+    assert.equal(received.email, "person@example.test");
+    await page.goto(`${origin}/admin/account`);
+    await page.getByText("Person Test · person@example.test").waitFor();
+    await page.goto(`${origin}/recovery`);
+    await page.getByRole("heading", { name: "Password recovery" }).waitFor();
+    assert.equal(await page.locator("form").count(), 0);
+
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto(`${origin}/admin/acme`);
-    await page.waitForURL(`${origin}/admin/acme/dashboard`);
+    await page.goto(`${origin}/admin`);
+    await page.waitForURL(`${origin}/admin/dashboard`);
     console.log(
       "Dashboard browser environment:",
       await page.evaluate(() => ({
@@ -271,7 +247,7 @@ async function main() {
       path: path.join(root, "test-results/dashboard-mobile.png"),
       fullPage: true,
     });
-    await page.goto(`${origin}/admin/acme/users`);
+    await page.goto(`${origin}/admin/users`);
     await page.getByRole("cell", { name: profile.email }).waitFor();
     await page.getByLabel("Search users", { exact: true }).fill("Person");
     await noOverflow();
@@ -307,7 +283,7 @@ async function main() {
         .evaluate((element) => getComputedStyle(element).borderRadius),
       "13px",
     );
-    await page.goto(`${origin}/admin/acme/faculty`);
+    await page.goto(`${origin}/admin/faculty`);
     await page.getByText("Anjali Deshpande", { exact: true }).waitFor();
     await page.getByRole("button", { name: /^Pending/ }).click();
     await page.waitForURL(/filter=Pending/);
@@ -315,7 +291,7 @@ async function main() {
     await page.waitForURL(/subject=Physics/);
     await page.getByText("Anjali Deshpande", { exact: true }).waitFor();
     await noOverflow();
-    await page.goto(`${origin}/admin/acme/settings`);
+    await page.goto(`${origin}/admin/settings`);
     await page
       .locator("header").getByRole("heading", { name: "Settings", exact: true })
       .waitFor();
@@ -330,21 +306,21 @@ async function main() {
     for (const [title, suffix] of destinations) {
       console.log('Checking admin destination:', title);
       await page.getByRole('navigation', { name: 'admin navigation', exact: true }).getByRole('link', { name: title, exact: true }).click();
-      await page.waitForURL(`${origin}/admin/acme/${suffix}`);
+      await page.waitForURL(`${origin}/admin/${suffix}`);
       await page.locator('header').getByRole('heading', { name: title, exact: true }).waitFor();
       assert.equal(await page.locator('nav [aria-current="page"]').count(), 1);
       assert.equal(await page.locator('.shell').getAttribute('data-persistence'), 'retained');
       await noOverflow();
     }
     await page.goBack();
-    await page.waitForURL(`${origin}/admin/acme/payouts`);
+    await page.waitForURL(`${origin}/admin/payouts`);
     await page.goForward();
-    await page.waitForURL(`${origin}/admin/acme/settings`);
+    await page.waitForURL(`${origin}/admin/settings`);
     await page.reload();
     await page.locator('header').getByRole('heading', { name: 'Settings', exact: true }).waitFor();
     await page.goto(`${origin}/admin`);
-    await page.waitForURL(`${origin}/admin/acme/dashboard`);
-    await page.goto(`${origin}/admin/acme/unknown/deep`);
+    await page.waitForURL(`${origin}/admin/dashboard`);
+    await page.goto(`${origin}/admin/unknown/deep`);
     await page.locator('main').getByRole('heading', { name: 'Page not found' }).waitFor();
     await page.getByRole("button", { name: "Use dark theme" }).click();
     assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");

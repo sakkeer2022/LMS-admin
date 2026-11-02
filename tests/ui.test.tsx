@@ -8,7 +8,7 @@ import {
   SelectField,
   SubmitButton,
 } from "../src/components/ui";
-import { registerSchema, loginSchema } from "../src/features/auth/schemas/auth";
+import { loginSchema } from "../src/features/auth/schemas/auth";
 
 describe("shared field and submission contracts", () => {
   it("associates labels, required state, descriptions and validation errors while preserving external descriptions", () => {
@@ -107,26 +107,9 @@ describe("shared field and submission contracts", () => {
       ),
     ).toContain("ui-button--primary");
   });
-  it("retains backend registration rules without imposing them on existing-account login", () => {
-    const input = {
-      email: "Person@example.com",
-      firstName: "Person",
-      lastName: "Test",
-      password: "LongEnough1!",
-    };
-    expect(registerSchema.parse(input).email).toBe("person@example.com");
-    for (const password of [
-      "Short1!",
-      "longenough1!",
-      "LONGENOUGH1!",
-      "LongEnough!!",
-      "LongEnough123",
-    ])
-      expect(registerSchema.safeParse({ ...input, password }).success).toBe(
-        false,
-      );
-    expect(
-      loginSchema.safeParse({ email: input.email, password: "legacy" }).success,
-    ).toBe(true);
+  it("accepts any existing password at login and lowercases the email", () => {
+    const parsed = loginSchema.parse({ email: "Person@example.com", password: "legacy" });
+    expect(parsed.email).toBe("person@example.com");
+    expect(loginSchema.safeParse({ email: "person@example.com", password: "" }).success).toBe(false);
   });
 });
