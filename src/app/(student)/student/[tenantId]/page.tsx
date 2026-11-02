@@ -1,9 +1,18 @@
-import { ExtensionPanel } from "@/components/ui/extension-panel";
-export default function Page() {
+import { Typography } from "@/components/ui";
+import { CategoryBrowser } from "@/features/discovery/components/category-browser";
+
+// Discover: browse the category tree down to a bookable leaf (ADR-0005). Tutor search
+// and slots attach here once the discovery and booking endpoints exist.
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ tenantId: string }>;
+}) {
+  const { tenantId } = await params;
   return (
-    <ExtensionPanel
-      title="Discover your next tutor"
-      description="Connect facet search and the SlotPicker once discovery endpoints exist."
-    />
+    <div className="flex flex-col gap-4">
+      <Typography variant="h1">Find what to learn</Typography>
+      <CategoryBrowser tenant={tenantId} />
+    </div>
   );
 }
