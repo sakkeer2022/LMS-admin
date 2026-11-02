@@ -138,7 +138,7 @@ async function main() {
         "Unexpected document overflow",
       );
     await page.goto(`${origin}/login?redirect=//evil.test`);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.getByRole("button", { name: "Log in", exact: true }).click();
     await page.getByText("Please correct the highlighted fields.").waitFor();
     assert.equal(attempts, 0);
     assert.equal(await page.locator(":focus").getAttribute("name"), "email");
@@ -156,7 +156,7 @@ async function main() {
     );
     await page.getByRole("button", { name: "Hide password" }).click();
     mode = "pending";
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.getByRole("button", { name: "Log in", exact: true }).click();
     await page.getByRole("button", { name: "Please wait…" }).waitFor();
     assert(
       await page.getByRole("button", { name: "Please wait…" }).isDisabled(),
@@ -188,13 +188,15 @@ async function main() {
     await context.addCookies([
       {
         name: "accessToken",
-        value: "browser-test-token",
+        value: [{ alg: "none" }, { exp: Math.floor(Date.now() / 1000) + 600 }]
+          .map((part) => Buffer.from(JSON.stringify(part)).toString("base64url"))
+          .join(".") + ".x", // the edge gate only reads the expiry
         url: origin,
         httpOnly: true,
         sameSite: "Strict",
       },
     ]);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.getByRole("button", { name: "Log in", exact: true }).click();
     await page.waitForURL(`${origin}/admin/dashboard`); // unsafe redirect remains rejected
     assert.equal(received.email, "person@example.test");
     await page.goto(`${origin}/admin/account`);

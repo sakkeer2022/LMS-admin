@@ -1,13 +1,13 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Card, Typography } from "@/components/ui";
+import Link from "next/link";
 import {
-  Form,
-  TextField,
-  PasswordField,
-  FormError,
-  SubmitButton,
-} from "@/components/ui";
+  LoginCheckbox,
+  LoginField,
+  LoginForm,
+  LoginHeading,
+  LoginSubmit,
+} from "@/components/ui/login-controls";
 
 import { api } from "@/lib/api/client";
 import { loginSchema } from "../schemas/auth";
@@ -46,9 +46,11 @@ export function AuthForm() {
     setError("");
     setFields({});
 
-    const parsed = loginSchema.safeParse(
-      Object.fromEntries(new FormData(event.currentTarget)),
-    );
+    const data = new FormData(event.currentTarget);
+    const parsed = loginSchema.safeParse({
+      email: data.get("email"),
+      password: data.get("password"),
+    });
 
     if (!parsed.success) {
       const messages: Record<string, string> = {};
@@ -64,7 +66,6 @@ export function AuthForm() {
     }
 
     submitting.current = true;
-
     setPending(true);
 
     try {
@@ -95,37 +96,54 @@ export function AuthForm() {
   }
 
   return (
-    <Card>
-      <Typography variant="h1">Welcome back</Typography>
-      <Form
-        ref={form}
-        onSubmit={submit}
-        pending={pending}
-        noValidate
-        aria-label="Sign in"
-      >
-        <TextField
+    <LoginForm
+      ref={form}
+      onSubmit={submit}
+      noValidate
+      aria-label="Admin login"
+      pending={pending}
+    >
+      <div>
+        <LoginHeading>Admin login</LoginHeading>
+        <p className="login-subtitle">
+          Sign in to access the Amentorz administration portal.
+        </p>
+      </div>
+      <div className="login-fields">
+        <LoginField
           name="email"
-          label="Email"
+          label="Email address"
           type="email"
+          icon="/auth/icon-mail.svg"
           autoComplete="email"
           error={fields.email}
           required
         />
-        <PasswordField
+        <LoginField
           name="password"
           label="Password"
+          type="password"
+          icon="/auth/icon-lock.svg"
           autoComplete="current-password"
           error={fields.password}
+          reveal
           required
         />
-        <FormError message={error} />
-        <SubmitButton pending={pending}>Sign in</SubmitButton>
-      </Form>
-    </Card>
+      </div>
+      {error && (
+        <p className="login-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="login-options">
+        <LoginCheckbox name="keepSignedIn" label="Keep me signed in" />
+        <Link className="login-link" href="/recovery">
+          Forgot password?
+        </Link>
+      </div>
+      <LoginSubmit pending={pending}>
+        {pending ? "Logging in…" : "Log in"}
+      </LoginSubmit>
+    </LoginForm>
   );
 }
-
-
-
-
