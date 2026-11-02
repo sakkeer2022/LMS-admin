@@ -24,3 +24,4 @@ export * from './Drawer';
 export * from './Menu';
 export * from './TreeAccordion';
 export * from './VirtualTree';
+export * from './Switch';
