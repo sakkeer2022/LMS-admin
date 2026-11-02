@@ -110,6 +110,7 @@ describe("shared field and submission contracts", () => {
   it("accepts any existing password at login and lowercases the email", () => {
     const parsed = loginSchema.parse({ email: "Person@example.com", password: "legacy" });
     expect(parsed.email).toBe("person@example.com");
+    expect(parsed.rememberMe).toBe(false);
     expect(loginSchema.safeParse({ email: "person@example.com", password: "" }).success).toBe(false);
   });
 });

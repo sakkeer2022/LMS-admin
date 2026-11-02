@@ -50,6 +50,7 @@ export function AuthForm() {
     const parsed = loginSchema.safeParse({
       email: data.get("email"),
       password: data.get("password"),
+      rememberMe: data.get("keepSignedIn") === "on",
     });
 
     if (!parsed.success) {
