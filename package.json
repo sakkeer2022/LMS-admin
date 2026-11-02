@@ -10,7 +10,8 @@
     "lint": "node scripts/check-ui.cjs",
     "test:browser": "node tests/browser/ui.cjs",
     "test:interactions": "node tests/browser/interactions.cjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "node tests/browser/category-tree-e2e.cjs"
   },
   "dependencies": {
     "next": "^15.5.0",
