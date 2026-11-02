@@ -23,3 +23,4 @@ export * from './ConfirmDialog';
 export * from './Drawer';
 export * from './Menu';
 export * from './TreeAccordion';
+export * from './VirtualTree';

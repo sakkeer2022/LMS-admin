@@ -746,3 +746,25 @@ select {
   align-items: center;
   gap: 2px;
 }
+
+/* VirtualTree: flat tree with drop indicators */
+.ui-vtree .ui-tree-label {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.ui-tree-row--dragging {
+  opacity: 0.5;
+}
+.ui-tree-row--drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.ui-tree-row--drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.ui-tree-row--drop-inside {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+.ui-tree-item[draggable="true"] > .ui-tree-row {
+  cursor: grab;
+}
