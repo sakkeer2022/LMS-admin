@@ -22,3 +22,14 @@ export function useRevokeOtherSessions() {
   const client = useQueryClient();
   return useMutation({ mutationFn: () => api<null>('/auth/sessions', { method: 'DELETE' }), onSuccess: () => client.invalidateQueries({ queryKey: authKeys.sessions() }) });
 }
+
+export interface SecurityEvent { id: string; action: string; createdAt: string; ipAddress?: string; userAgent?: string }
+export function useActivity() { return useQuery({ queryKey: [...authKeys.all, 'activity'], queryFn: ({ signal }) => api<SecurityEvent[]>('/admin/me/activity?limit=10', { signal }), retry: false }); }
+export interface ProfileUpdate { fullName: string; mobileNumber: string | null; timezone: string | null }
+export function useUpdateProfile() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ProfileUpdate) => api<UserProfile>('/admin/me/profile', { method: 'PUT', body: JSON.stringify(input) }),
+    onSuccess: (response) => { client.setQueryData(authKeys.me(), response); client.invalidateQueries({ queryKey: [...authKeys.all, 'activity'] }); },
+  });
+}

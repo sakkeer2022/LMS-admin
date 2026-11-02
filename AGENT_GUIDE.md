@@ -13,7 +13,7 @@ src/
     layout.tsx, providers.tsx, globals.css, error.tsx, loading.tsx, page.tsx
     (auth)/login, recovery
     (admin)/admin/layout.tsx     requireAdmin + PermissionProvider + AdminLayout
-      dashboard/ users/ audit/ reports/ account/ [section]/ [...unknown]/
+      dashboard/ users/ audit/ reports/ profile/ [section]/ [...unknown]/
     access-denied/
   components/
     layout/ (portal-shell, admin/*)  security/ (permission-provider, sensitive-boundary)

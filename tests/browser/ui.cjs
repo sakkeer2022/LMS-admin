@@ -199,8 +199,8 @@ async function main() {
     await page.getByRole("button", { name: "Log in", exact: true }).click();
     await page.waitForURL(`${origin}/admin/dashboard`); // unsafe redirect remains rejected
     assert.equal(received.email, "person@example.test");
-    await page.goto(`${origin}/admin/account`);
-    await page.getByText("Person Test · person@example.test").waitFor();
+    await page.goto(`${origin}/admin/profile`);
+    await page.getByRole("heading", { name: "My profile" }).waitFor(); // other calls on the page are not mocked here
     await page.goto(`${origin}/recovery`);
     await page.getByRole("heading", { name: "Password recovery" }).waitFor();
     assert.equal(await page.locator("form").count(), 0);

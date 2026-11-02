@@ -1,17 +1,6 @@
+@import "../../styles/figma-tokens.css";
 /* Admin login: tokens and layout from Figma "Screen/02 · Login" (node 993:49844) */
 .login {
-  --bg-surface: #fff;
-  --bg-brand-subtle: #f5eaf5;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-tertiary: #64748b;
-  --text-brand: #562b7a;
-  --text-error: #991b1b;
-  --text-on-brand: #fff;
-  --border-default: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --action-primary: #913d95;
-  --radius-default: 6px;
   display: flex;
   min-height: 100vh;
   background: var(--bg-surface);

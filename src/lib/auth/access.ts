@@ -7,6 +7,8 @@ export const sessionUserSchema = z.object({
   email: z.string(),
   fullName: z.string(),
   mobileNumber: z.string().nullable(),
+  timezone: z.string().nullish(),
+  lastLoginAt: z.string().nullish(),
   isActive: z.boolean(),
   emailVerified: z.boolean(),
   roles: z.array(z.object({

@@ -22,7 +22,7 @@ npm run build
 
 ## Sign-in
 
-`/login` signs in through `POST /auth/admin/login`. Only accounts with the admin role (the backend also lets `super_admin` in) reach `/admin/...`. The admin layout checks the session with `GET /auth/me` on the server; no secret is shared with the backend. Password recovery (`/recovery`) is a placeholder until the backend recovery endpoints exist (LMS-99 and LMS-100).
+`/login` signs in through `POST /auth/admin/login`. Only accounts with the admin role (the backend also lets `super_admin` in) reach `/admin/...`. The admin layout checks the session with `GET /auth/me` on the server; no secret is shared with the backend. `/admin/profile` is the admin's own profile (details, access, devices, activity; backed by `PUT /admin/me/profile` and `GET /admin/me/activity`). Password recovery (`/recovery`) is a placeholder until the backend recovery endpoints exist (LMS-99 and LMS-100).
 
 ## UI
 

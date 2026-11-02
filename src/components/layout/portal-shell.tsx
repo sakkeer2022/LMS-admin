@@ -7,6 +7,7 @@ import {
   Typography,
 } from "@/components/ui";
 import { Link } from "@/components/ui/Link";
+import { useMe } from "@/features/auth/api/auth";
 import { api } from "@/lib/api/client";
 import { adminNavigation, portalBrand, portalTitle } from "@/lib/auth/portal-config";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,10 +25,17 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AdminHeader } from "./admin/AdminHeader";
 import { AdminPageContainer } from "./admin/AdminPageContainer";
 import { AdminSidebar } from "./admin/AdminSidebar";
+// Up to two letters from the person's name; a neutral mark until it has loaded
+function initialsOf(name?: string) {
+  const words = name?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (words.length === 0) return "•";
+  return (words[0]![0]! + (words.length > 1 ? words[words.length - 1]![0]! : "")).toUpperCase();
+}
 export function PortalShell({ children }: { children: ReactNode }) {
   const pathname = usePathname(),
    client = useQueryClient();
   const base = "/admin";
+  const initials = initialsOf(useMe().data?.data.fullName);
   const [collapsed, setCollapsed] = useState(false),
     [mobile, setMobile] = useState(false),
     [search, setSearch] = useState(""),
@@ -140,10 +148,10 @@ export function PortalShell({ children }: { children: ReactNode }) {
           }}
         />
         <div className="sidebar-account">
-          <Link href="/admin/account" className="account-link">
-            <span className="avatar">AC</span>
+          <Link href="/admin/profile" className="account-link">
+            <span className="avatar">{initials}</span>
             <span>
-              My account
+              My profile
               <Typography variant="inherit" component="small" tone="muted">
                 {portalTitle}
               </Typography>
@@ -235,18 +243,12 @@ export function PortalShell({ children }: { children: ReactNode }) {
             <Disclosure
               className="header-menu"
               label="Notifications"
-              summary={
-                <>
-                  <Bell size={18} />
-                  <span className="notification-dot" />
-                </>
-              }
+              summary={<Bell size={18} />}
             >
               <div className="popover">
                 <strong>Notifications</strong>
                 <Typography tone="muted">
-                  No connected notification feed. Operational demo alerts are
-                  available on the dashboard.
+                  No notifications yet.
                 </Typography>
                 <Link href={base}>Open dashboard</Link>
               </div>
@@ -254,10 +256,10 @@ export function PortalShell({ children }: { children: ReactNode }) {
             <Disclosure
               className="header-menu"
               label="User menu"
-              summary={<span className="avatar">AC</span>}
+              summary={<span className="avatar">{initials}</span>}
             >
               <div className="popover">
-                <Link href="/admin/account">Account & sessions</Link>
+                <Link href="/admin/profile">My profile</Link>
                 <Button
                   pending={loggingOut}
                   pendingLabel="Signing out…"
