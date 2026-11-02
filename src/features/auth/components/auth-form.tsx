@@ -14,6 +14,10 @@ import { loginSchema } from "../schemas/auth";
 import { safeRedirect } from "@/lib/auth/access";
 import { ApiError } from "@/lib/api/contracts";
 
+// One refresh per page load: React strict mode runs effects twice in development, and a second
+// refresh with the already-rotated cookie would be treated as token theft and end the session
+let silentRefresh: Promise<unknown> | undefined;
+
 export function AuthForm() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -30,7 +34,9 @@ export function AuthForm() {
     const target = new URLSearchParams(window.location.search).get("redirect");
     if (!target) return;
     let cancelled = false;
-    api("/auth/refresh", { method: "POST" })
+    (silentRefresh ??= api("/auth/refresh", { method: "POST" }).finally(() => {
+      setTimeout(() => (silentRefresh = undefined), 5000);
+    }))
       .then(() => {
         if (!cancelled) window.location.assign(safeRedirect(target));
       })
