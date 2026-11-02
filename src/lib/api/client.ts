@@ -99,6 +99,7 @@ export async function api<T>(
       body.message,
       !body.success ? body.errors : undefined,
       !body.success ? body.traceId : undefined,
+      !body.success ? body.code : undefined,
     );
   return body;
 }
