@@ -1,14 +1,14 @@
 "use client";
-import { useMemo, useState } from 'react';
-import { Button, ConfirmDialog, Drawer, SelectField, TextField, Typography } from '@/components/ui';
+import { useState } from 'react';
+import { Button, ConfirmDialog, Drawer, TextField, Typography } from '@/components/ui';
 import { CheckField } from './check-field';
 import { PanelSkeleton } from '@/components/ui/dashboard-ui';
 import { describeApiError } from '@/lib/api/errors';
 import {
-  useCategoryDetail, useCreateCategory, useDeleteCategory, useLookup, useMoveCategory, useSaveLeafSettings, useUpdateCategory,
+  useCategoryDetail, useCreateCategory, useDeleteCategory, useLookup, useSaveLeafSettings, useUpdateCategory,
   type CategoryNode,
 } from '@/lib/api/category-tree';
-import { CODE_PATTERN, codeFromName, moveTargets } from '@/lib/api/category-tree-model';
+import { CODE_PATTERN, codeFromName } from '@/lib/api/category-tree-model';
 
 export type FormState = { mode: 'create'; parent: CategoryNode | null } | { mode: 'edit'; node: CategoryNode };
 
@@ -116,48 +116,6 @@ export function CategoryFormDialog({ tenant, state, nodes, onClose, onSaved }: {
       {error && <Typography variant="body2" tone="danger" role="alert">{error}</Typography>}
     </div>
   </Drawer>;
-}
-
-/** Move to a new parent. The picker leaves out the category itself and everything below it. */
-export function MoveCategoryDialog({ tenant, node, nodes, initialParentId, onClose, onMoved }: {
-  tenant: string;
-  node: CategoryNode;
-  nodes: readonly CategoryNode[];
-  initialParentId?: string | null;
-  onClose: () => void;
-  onMoved: (parentId: string | null) => void;
-}) {
-  const move = useMoveCategory(tenant);
-  const options = useMemo(() => moveTargets(nodes, node), [nodes, node]);
-  const [filter, setFilter] = useState('');
-  const [target, setTarget] = useState<string>(initialParentId === undefined ? '' : initialParentId ?? 'root');
-  const [error, setError] = useState<string>();
-  const shown = options.filter((o) => o.label.toLowerCase().includes(filter.trim().toLowerCase()));
-  const parentId = target === 'root' ? null : target;
-  const descendants = nodes.filter((n) => n.path.startsWith(`${node.path}/`)).length;
-
-  return <ConfirmDialog title={`Move ${node.name}`} confirmLabel="Move" pending={move.isPending} onCancel={onClose}
-    onConfirm={() => {
-      if (!target) { setError('Choose where to move it.'); return; }
-      setError(undefined);
-      move.mutate({ id: node.id, version: node.version, parentId }, {
-        onSuccess: () => onMoved(parentId),
-        onError: (err) => setError(describeApiError(err, 'move categories').message),
-      });
-    }}>
-    <div className="flex flex-col gap-3">
-      <Typography variant="body2">
-        {descendants ? `${node.name} and the ${descendants} categories below it move together.` : `${node.name} moves on its own.`} Its curricula and students stay attached.
-      </Typography>
-      <TextField label="Filter parents" type="search" value={filter} onChange={(e) => setFilter(e.target.value)} />
-      <SelectField label="New parent" value={target} onChange={(e) => setTarget(e.target.value)} size={Math.min(8, Math.max(2, shown.length + 1))}>
-        <option value="" disabled>Choose a parent…</option>
-        {shown.map((o) => <option key={o.id ?? 'root'} value={o.id ?? 'root'}>{o.label}</option>)}
-      </SelectField>
-      {options.length === 0 && <Typography variant="body2" tone="muted">There is nowhere else to move it.</Typography>}
-      {error && <Typography variant="body2" tone="danger" role="alert">{error}</Typography>}
-    </div>
-  </ConfirmDialog>;
 }
 
 /** Hard delete. The server refuses while anything depends on the category and says why. */

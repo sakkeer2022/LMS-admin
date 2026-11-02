@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { api, queryString } from './client';
-import { applyMove, applyRename, applyReorder } from './category-tree-model';
+import { applyRelocation, applyRename, applyReorder, relocation, type Placement } from './category-tree-model';
 
 // Contract: amentorz-backend src/modules/category-tree (category-tree.routes.ts,
 // category-tree.dto.ts, category-tree.reads.ts), ADR-0005. Lives in lib because the
@@ -168,12 +168,22 @@ export const useReorderCategories = (tenant: string) =>
     (nodes, { orderedIds }) => applyReorder(nodes, orderedIds)
   );
 
-export const useMoveCategory = (tenant: string) =>
+export type Relocation = ReturnType<typeof relocation>;
+
+/**
+ * A drop in reorder mode: a reorder within the same parent, or a move to a position under
+ * another parent (one transaction on the server). The caller works out `change` from the
+ * tree it shows (relocation()); the tree updates at once and rolls back if the server refuses.
+ */
+export const useRelocateCategory = (tenant: string) =>
   useTreeMutation(
     tenant,
-    async ({ id, ...body }: { id: string; version: number; parentId: string | null }) =>
-      categoryDetailSchema.parse((await api<unknown>(`${at(id)}/move`, json('PUT', body))).data),
-    (nodes, { id, parentId }) => applyMove(nodes, id, parentId)
+    async ({ node, change }: { node: CategoryNode; to: Placement; change: Relocation }) => {
+      if (change.kind === 'reorder') await api<unknown>(`${base}/reorder`, json('PUT', { parentId: change.parentId, orderedIds: change.orderedIds }));
+      if (change.kind === 'move') await api<unknown>(`${at(node.id)}/move`, json('PUT', { version: node.version, parentId: change.parentId, index: change.index }));
+      return change.kind;
+    },
+    (nodes, { node, to, change }) => (change.kind === 'none' ? nodes : applyRelocation(nodes, node.id, to))
   );
 
 export const useDeleteCategory = (tenant: string) =>

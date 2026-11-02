@@ -94,26 +94,6 @@ export function isSelfOrDescendant(node: Pick<CategoryNode, 'path'>, candidate: 
   return candidate.path === node.path || candidate.path.startsWith(`${node.path}/`);
 }
 
-export interface ParentOption {
-  id: string | null;
-  label: string;
-}
-
-/**
- * Where a node may move: any category except itself, its descendants, its current parent
- * and bookable leaves (they cannot have children). null = make it a root.
- */
-export function moveTargets(nodes: readonly CategoryNode[], node: CategoryNode): ParentOption[] {
-  const byPath = new Map(nodes.map((n) => [n.path, n]));
-  const label = (n: CategoryNode) => [...ancestorPaths(n.path).map((p) => byPath.get(p)?.name ?? p), n.name].join(' › ');
-  const options: ParentOption[] = node.parentId ? [{ id: null, label: 'Top level (make it a root)' }] : [];
-  for (const n of [...nodes].sort((a, b) => a.path.localeCompare(b.path))) {
-    if (isSelfOrDescendant(node, n) || n.id === node.parentId || n.isBookable) continue;
-    options.push({ id: n.id, label: label(n) });
-  }
-  return options;
-}
-
 /** Why "Add sub-category" is unavailable, or null when it is allowed. */
 export function addChildBlockedReason(node: CategoryNode): string | null {
   return node.isBookable ? 'A bookable category cannot have sub-categories. Turn off booking in Edit first.' : null;
@@ -162,35 +142,154 @@ export function applyMove(nodes: CategoryNode[], id: string, parentId: string | 
   });
 }
 
-/** New sibling order after dragging `draggedId` before or after `targetId`. */
-export function reorderedSiblings(nodes: readonly CategoryNode[], draggedId: string, targetId: string, after: boolean): string[] | null {
-  const dragged = nodes.find((n) => n.id === draggedId);
-  const target = nodes.find((n) => n.id === targetId);
-  if (!dragged || !target || dragged.parentId !== target.parentId || dragged.id === target.id) return null;
-  const siblings = nodes.filter((n) => n.parentId === dragged.parentId).sort(compareSiblings).map((n) => n.id).filter((id) => id !== draggedId);
-  siblings.splice(siblings.indexOf(targetId) + (after ? 1 : 0), 0, draggedId);
-  return siblings;
+// ── Drag and drop (reorder mode) ─────────────────────────────────────────────
+
+export interface FlatItem {
+  id: string;
+  parentId: string | null;
+  depth: number;
 }
 
-/** Up/down by one place, for the keyboard alternative to dragging. */
-export function shiftedSiblings(nodes: readonly CategoryNode[], id: string, by: -1 | 1): string[] | null {
+/** Where a drop lands: the new parent and the position among its children. */
+export interface Placement {
+  parentId: string | null;
+  index: number;
+}
+
+export type InvalidReason = 'PARENT_IS_BOOKABLE' | 'INTO_ITSELF';
+
+export interface Projection extends Placement {
+  depth: number;
+  /** Set when the drop is not allowed; the UI shows it and ignores the drop */
+  invalid: InvalidReason | null;
+}
+
+function arrayMove<T>(list: readonly T[], from: number, to: number): T[] {
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+/**
+ * Projected drop for a flat, visible tree (the dragged node's own subtree is left out).
+ * The row the pointer is over gives the vertical position; the horizontal offset, in
+ * indentation steps, picks the depth between what the rows above and below allow.
+ */
+export function projectDrop(
+  items: readonly FlatItem[],
+  nodes: readonly CategoryNode[],
+  activeId: string,
+  overId: string,
+  offsetX: number,
+  indentWidth: number,
+): Projection | null {
+  const activeIndex = items.findIndex((i) => i.id === activeId);
+  const overIndex = items.findIndex((i) => i.id === overId);
+  if (activeIndex < 0 || overIndex < 0) return null;
+  const moved = arrayMove(items, activeIndex, overIndex);
+  const previous = moved[overIndex - 1];
+  const next = moved[overIndex + 1];
+  const maxDepth = previous ? previous.depth + 1 : 0;
+  const minDepth = next ? next.depth : 0;
+  const wanted = items[activeIndex].depth + Math.round(offsetX / indentWidth);
+  const depth = Math.max(minDepth, Math.min(maxDepth, wanted));
+
+  let parentId: string | null = null;
+  if (depth > 0 && previous) {
+    if (previous.depth === depth) parentId = previous.parentId;
+    else if (previous.depth < depth) parentId = previous.id;
+    else parentId = moved.slice(0, overIndex).reverse().find((i) => i.depth === depth)?.parentId ?? null;
+  }
+  const index = moved.slice(0, overIndex).filter((i) => i.parentId === parentId && i.depth === depth).length;
+  return { parentId, index, depth, invalid: placementError(nodes, activeId, parentId) };
+}
+
+/** Why `id` may not go under `parentId`, or null. Mirrors the server's checks. */
+export function placementError(nodes: readonly CategoryNode[], id: string, parentId: string | null): InvalidReason | null {
+  if (parentId === null) return null;
+  const node = nodes.find((n) => n.id === id);
+  const parent = nodes.find((n) => n.id === parentId);
+  if (!node || !parent) return null;
+  if (isSelfOrDescendant(node, parent)) return 'INTO_ITSELF';
+  if (parent.isBookable) return 'PARENT_IS_BOOKABLE';
+  return null;
+}
+
+export function invalidDropMessage(reason: InvalidReason, nodes: readonly CategoryNode[], parentId: string | null) {
+  const parent = nodes.find((n) => n.id === parentId)?.name ?? 'that category';
+  return reason === 'PARENT_IS_BOOKABLE'
+    ? `${parent} is bookable, so it cannot have sub-categories.`
+    : 'A category cannot move inside itself or one of its sub-categories.';
+}
+
+/** Children of a parent in display order. */
+export function siblingIds(nodes: readonly CategoryNode[], parentId: string | null) {
+  return nodes.filter((n) => n.parentId === parentId).sort(compareSiblings).map((n) => n.id);
+}
+
+/** `id` placed at `index` among the other children (clamped). */
+export function insertAt(ids: readonly string[], id: string, index: number) {
+  const rest = ids.filter((x) => x !== id);
+  const at = Math.max(0, Math.min(index, rest.length));
+  return [...rest.slice(0, at), id, ...rest.slice(at)];
+}
+
+/** What a placement means for the API: nothing, a reorder within the parent, or a move. */
+export function relocation(nodes: readonly CategoryNode[], id: string, to: Placement):
+  | { kind: 'none' }
+  | { kind: 'reorder'; parentId: string | null; orderedIds: string[] }
+  | { kind: 'move'; parentId: string | null; index: number } {
+  const node = nodes.find((n) => n.id === id);
+  if (!node) return { kind: 'none' };
+  if (node.parentId !== to.parentId) return { kind: 'move', parentId: to.parentId, index: to.index };
+  const current = siblingIds(nodes, to.parentId);
+  const orderedIds = insertAt(current, id, to.index);
+  return orderedIds.every((x, i) => x === current[i]) ? { kind: 'none' } : { kind: 'reorder', parentId: to.parentId, orderedIds };
+}
+
+/** The tree after a drop, as the server will store it (optimistic update). */
+export function applyRelocation(nodes: CategoryNode[], id: string, to: Placement): CategoryNode[] {
+  const node = nodes.find((n) => n.id === id);
+  if (!node) return nodes;
+  const moved = node.parentId === to.parentId ? nodes : applyMove(nodes, id, to.parentId);
+  return applyReorder(moved, insertAt(siblingIds(moved, to.parentId), id, to.index));
+}
+
+/**
+ * Keyboard alternative to dragging (reorder mode, on a row's handle):
+ * Alt+Up / Alt+Down move among siblings, Alt+Right nests under the previous sibling,
+ * Alt+Left moves out to just after the parent.
+ */
+export function keyboardPlacement(
+  nodes: readonly CategoryNode[],
+  id: string,
+  key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight',
+): Placement | { invalid: InvalidReason; parentId: string | null } | null {
   const node = nodes.find((n) => n.id === id);
   if (!node) return null;
-  const siblings = nodes.filter((n) => n.parentId === node.parentId).sort(compareSiblings).map((n) => n.id);
-  const from = siblings.indexOf(id);
-  const to = from + by;
-  if (to < 0 || to >= siblings.length) return null;
-  [siblings[from], siblings[to]] = [siblings[to], siblings[from]];
-  return siblings;
+  const siblings = siblingIds(nodes, node.parentId);
+  const at = siblings.indexOf(id);
+  switch (key) {
+    case 'ArrowUp': return at > 0 ? { parentId: node.parentId, index: at - 1 } : null;
+    case 'ArrowDown': return at < siblings.length - 1 ? { parentId: node.parentId, index: at + 1 } : null;
+    case 'ArrowRight': {
+      if (at === 0) return null;
+      const target = siblings[at - 1];
+      const invalid = placementError(nodes, id, target);
+      return invalid ? { invalid, parentId: target } : { parentId: target, index: siblingIds(nodes, target).length };
+    }
+    case 'ArrowLeft': {
+      const parent = nodes.find((n) => n.id === node.parentId);
+      if (!parent) return null;
+      return { parentId: parent.parentId, index: siblingIds(nodes, parent.parentId).indexOf(parent.id) + 1 };
+    }
+  }
 }
 
-/** What a drop on `target` would do: reorder among siblings, move inside, or nothing. */
-export function dropIntent(nodes: readonly CategoryNode[], draggedId: string, target: CategoryNode): 'reorder' | 'move' | null {
-  const dragged = nodes.find((n) => n.id === draggedId);
-  if (!dragged || dragged.id === target.id) return null;
-  if (dragged.parentId === target.parentId) return 'reorder';
-  if (target.isBookable || isSelfOrDescendant(dragged, target) || target.id === dragged.parentId) return null;
-  return 'move';
+/** Compact count for a row, as in the design: children for a branch, curricula for a leaf. */
+export function rowCount(node: CategoryNode) {
+  return node.childrenCount > 0 ? node.childrenCount : node.curriculaCount;
 }
 
 /** A code from a name: lowercase, digits and hyphens, starting with a letter. */
