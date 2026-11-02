@@ -86,7 +86,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  width: 280px;
+  width: 320px;
   max-width: 100%;
 }
 .sp-input {
@@ -158,9 +158,11 @@
 }
 .sp-pill {
   display: inline-flex;
+  flex: none;
   align-items: center;
   padding: 2px 8px;
   border-radius: 999px;
+  white-space: nowrap;
   background: var(--bg-brand-subtle);
   color: var(--text-brand);
   font-size: 12px;

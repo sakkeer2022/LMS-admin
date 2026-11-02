@@ -92,7 +92,7 @@ export const SettingInput = forwardRef<
 >(function SettingInput({ error, className, ...props }, ref) {
   const errorId = error && props.id ? `${props.id}-error` : undefined;
   return (
-    <div style={{ width: "100%" }}>
+    <div style={{ flex: "1 1 0", minWidth: 0 }}>
       <input
         {...props}
         ref={ref}
