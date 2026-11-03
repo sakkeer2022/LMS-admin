@@ -599,3 +599,192 @@ td.money {
   font-size: var(--text-caption);
   margin-top: 3px;
 }
+
+/* ── Faculty management (screen 27, LMS-78 / LMS-79) ─────────────────── */
+.faculty-tabs {
+  gap: 4px;
+  margin: 20px 0 20px;
+}
+.faculty-tabs .ui-button--tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+.faculty-tabs .ui-button--tab[aria-selected="true"] {
+  font-weight: 500;
+}
+.faculty-tab-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+.faculty-tabs .ui-button--tab[aria-selected="true"] .faculty-tab-count {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.faculty-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.faculty-filters .ui-field {
+  margin-block: 0;
+}
+.faculty-category-filter {
+  min-width: 150px;
+}
+.faculty-more-filters > summary {
+  white-space: nowrap;
+}
+.faculty-more-filters .filter-menu-panel {
+  width: 240px;
+}
+.faculty-more-filters .ui-field {
+  margin-block: 0 var(--space-2);
+}
+.faculty-clear-filters {
+  width: 100%;
+}
+/* Tighter cells so all seven columns fit beside the sidebar at 1100px */
+.faculty-queue td,
+.faculty-queue th {
+  padding-inline: 14px;
+}
+.faculty-queue td:first-child,
+.faculty-queue th:first-child {
+  padding-left: 20px;
+}
+.faculty-queue td.faculty-wrap {
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  min-width: 120px;
+}
+.faculty-documents {
+  font-weight: 600;
+  color: var(--ink);
+}
+.faculty-actions {
+  width: 1%;
+  text-align: right;
+}
+.faculty-status {
+  font-weight: 500;
+}
+.faculty-skeleton-cell {
+  height: 14px;
+  margin: 6px 0;
+  min-width: 48px;
+}
+.faculty-empty {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 24px 20px;
+}
+.faculty-refreshing {
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+/* Invite tutors modal */
+.ui-modal.invite-modal {
+  width: min(430px, calc(100vw - 32px));
+  padding: 0;
+}
+.invite-modal .ui-modal-header {
+  margin: 0;
+  padding: 16px 16px 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.invite-modal .ui-modal-header h2 {
+  font-size: 16px;
+}
+.invite-modal-body {
+  padding: 8px 20px 16px;
+}
+.invite-modal-body .ui-field {
+  margin-block: var(--space-3) var(--space-2);
+}
+.invite-errors {
+  display: grid;
+  gap: 2px;
+}
+.invite-chips-block {
+  margin-top: 4px;
+}
+.invite-chips-label {
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.invite-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.invite-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 1px 2px 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--subtle);
+  font-size: var(--text-caption);
+}
+.invite-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.invite-chip--error {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.invite-chip-remove.ui-button {
+  min-height: 22px;
+  width: 22px;
+  padding: 0;
+  color: var(--muted);
+}
+.invite-help {
+  margin-top: 12px;
+  max-width: 300px;
+}
+.invite-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+.invite-modal-footer .ui-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+@media (max-width: 640px) {
+  .faculty-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .faculty-tabs .ui-button--tab {
+    flex-shrink: 0;
+  }
+  .faculty-filters {
+    width: 100%;
+  }
+  .faculty-category-filter {
+    flex: 1;
+  }
+}
