@@ -33,3 +33,6 @@ export function useUpdateProfile() {
     onSuccess: (response) => { client.setQueryData(authKeys.me(), response); client.invalidateQueries({ queryKey: [...authKeys.all, 'activity'] }); },
   });
 }
+export interface PasswordChangeInput { currentPassword: string; newPassword: string }
+// The backend ends every session on success, including this one
+export function useChangePassword() { return useMutation({ mutationFn: (input: PasswordChangeInput) => api<null>('/auth/password', { method: 'PUT', body: JSON.stringify(input) }) }); }

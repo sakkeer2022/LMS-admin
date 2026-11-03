@@ -27,6 +27,7 @@ import {
 import { ApiError } from "@/lib/api/contracts";
 import { permissionsOf } from "@/lib/auth/access";
 import { describeDevice } from "@/lib/auth/device";
+import { ChangePasswordDialog } from "./change-password-dialog";
 import { ACTIVITY_LABELS, WARNING_ACTIONS } from "./labels";
 import { profileSchema, type ProfileValues } from "./schema";
 
@@ -303,6 +304,7 @@ function SecurityCard({
   lastLoginAt?: string | null;
   format: Intl.DateTimeFormat;
 }) {
+  const [changing, setChanging] = useState(false);
   return (
     <SettingCard title="Sign-in and security" caption="Protect your account">
       <SettingRow
@@ -317,10 +319,16 @@ function SecurityCard({
       </SettingRow>
       <SettingRow
         label="Password"
-        description="Changing your password signs you out everywhere. This arrives with account recovery."
+        description="Changing your password signs you out everywhere."
       >
-        <SettingButton disabled>Change password</SettingButton>
+        <SettingButton onClick={() => setChanging(true)}>
+          Change password
+        </SettingButton>
       </SettingRow>
+      <ChangePasswordDialog
+        open={changing}
+        onClose={() => setChanging(false)}
+      />
     </SettingCard>
   );
 }

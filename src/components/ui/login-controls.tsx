@@ -24,7 +24,10 @@ export function LoginHeading({ children }: { children: string }) {
 type LoginFieldProps = Omit<ComponentProps<"input">, "id" | "name"> & {
   name: string;
   label: string;
-  icon: string;
+  /** Leading icon; the recovery screens have none */
+  icon?: string;
+  /** Helper text under the field */
+  hint?: string;
   error?: string;
   /** Adds the show/hide toggle for a password input */
   reveal?: boolean;
@@ -34,6 +37,7 @@ export function LoginField({
   name,
   label,
   icon,
+  hint,
   error,
   reveal,
   type,
@@ -42,6 +46,7 @@ export function LoginField({
 }: LoginFieldProps) {
   const [visible, setVisible] = useState(false);
   const errorId = error ? `${name}-error` : undefined;
+  const hintId = hint ? `${name}-hint` : undefined;
   return (
     <div className="login-field">
       <label className="login-label" htmlFor={name}>
@@ -53,8 +58,10 @@ export function LoginField({
         )}
       </label>
       <div className="login-control" data-invalid={Boolean(error)}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="login-icon" src={icon} alt="" />
+        {icon && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="login-icon" src={icon} alt="" />
+        )}
         <input
           {...props}
           id={name}
@@ -62,7 +69,9 @@ export function LoginField({
           required={required}
           type={reveal && visible ? "text" : type}
           aria-invalid={Boolean(error)}
-          aria-describedby={errorId}
+          aria-describedby={
+            [errorId, hintId].filter(Boolean).join(" ") || undefined
+          }
         />
         {reveal && (
           <button
@@ -77,6 +86,11 @@ export function LoginField({
           </button>
         )}
       </div>
+      {hint && !error && (
+        <p id={hintId} className="login-hint">
+          {hint}
+        </p>
+      )}
       {error && (
         <p id={errorId} className="login-field-error">
           {error}
@@ -112,6 +126,19 @@ export function LoginSubmit({
       disabled={pending}
       aria-busy={pending || undefined}
     >
+      {children}
+    </button>
+  );
+}
+
+export function LoginSecondaryButton({
+  children,
+  ...props
+}: Omit<ComponentProps<"button">, "type" | "className"> & {
+  children: string;
+}) {
+  return (
+    <button {...props} type="button" className="login-secondary">
       {children}
     </button>
   );
