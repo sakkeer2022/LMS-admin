@@ -13,7 +13,7 @@ export type AdminNavigationGroup = {
   label: string;
   items: [title: string, suffix: string, icon: AdminIcon][];
 };
-// Tenant scope is supplied by the authorized server layout.
+// Suffixes are appended to the admin base path (/admin).
 export const adminNavigation: AdminNavigationGroup[] = [
   { label: 'Overview', items: [['Dashboard', '/dashboard', 'dashboard']] },
   { label: 'People', items: [['Users', '/users', 'users'], ['Faculty', '/faculty', 'faculty']] },

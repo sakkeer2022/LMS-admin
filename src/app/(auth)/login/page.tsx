@@ -1,11 +1,7 @@
-import { Link } from '@/components/ui/Link';
 import { AuthForm } from "@/features/auth/components/auth-form";
+
+export const metadata = { title: "Admin login" };
+
 export default function Login() {
-  return (
-    <>
-      <AuthForm />
-      <Link href="/register">Create account</Link> ·{" "}
-      <Link href="/recovery">Recover access</Link>
-    </>
-  );
+  return <AuthForm />;
 }

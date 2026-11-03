@@ -1,30 +1,32 @@
 import { z } from 'zod';
-export const claimsSchema = z.object({
-  sub: z.string().min(1), email: z.string(), roles: z.array(z.string()), permissions: z.array(z.string()),
-  exp: z.number(), jti: z.string().optional(), policies: z.array(z.unknown()).optional(),
-  tenantIds: z.array(z.string()).optional(),
+
+// The user returned by GET /auth/me (the backend contract `User`). The backend presents the
+// super_admin role as `admin`, so the admin portal checks one role name.
+export const sessionUserSchema = z.object({
+  id: z.string().min(1),
+  email: z.string(),
+  fullName: z.string(),
+  mobileNumber: z.string().nullable(),
+  timezone: z.string().nullish(),
+  lastLoginAt: z.string().nullish(),
+  isActive: z.boolean(),
+  emailVerified: z.boolean(),
+  roles: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    permissions: z.array(z.object({ name: z.string() })),
+  })),
 });
-export type Claims = z.infer<typeof claimsSchema>;
-export const portals = {
-  admin: { title: 'Operations', roles: ['super_admin', 'admin'], links: [['Overview', ''], ['Users', '/users'], ['Audit logs', '/audit'], ['Financial reports', '/reports']] },
-  faculty: { title: 'Provider workspace', roles: ['faculty', 'provider'], links: [['Today', ''], ['Availability', '/availability'], ['Bookings', '/bookings'], ['Daily logs', '/logs'], ['Earnings', '/earnings']] },
-  student: { title: 'Learning workspace', roles: ['student', 'client', 'viewer'], links: [['Discover', ''], ['Bookings', '/bookings'], ['Progress reports', '/reports']] },
-  session: { title: 'Live session', roles: ['super_admin', 'admin', 'faculty', 'provider', 'student', 'client', 'viewer'], links: [] },
-} as const;
-export type Portal = keyof typeof portals;
-export function portalAllowed(claims: Claims, portal: Portal) { return portals[portal].roles.some(role => claims.roles.includes(role)); }
-export function homeFor(claims: Claims) { return (['admin', 'faculty', 'student'] as const).find(p => portalAllowed(claims, p)); }
-/**
- * Tenants the signed claims grant. The backend has no tenant model yet and issues no
- * tenantIds claim, so a single-tenant deployment names its one tenant in the server-only
- * SINGLE_TENANT_ID. A token that does carry tenantIds is always checked against it alone.
- */
-export function grantedTenants(claims: Claims, singleTenant = process.env.SINGLE_TENANT_ID) {
-  if (claims.tenantIds) return claims.tenantIds;
-  return singleTenant ? [singleTenant] : [];
+export type SessionUser = z.infer<typeof sessionUserSchema>;
+
+export const ADMIN_ROLE = 'admin';
+export const ADMIN_HOME = '/admin/dashboard';
+
+export function isAdmin(user: SessionUser) {
+  return user.isActive && user.roles.some(role => role.name === ADMIN_ROLE);
 }
-export function tenantAllowed(claims: Claims, tenant: string, singleTenant?: string) {
-  return grantedTenants(claims, singleTenant).includes(tenant);
+export function permissionsOf(user: SessionUser) {
+  return [...new Set(user.roles.flatMap(role => role.permissions.map(permission => permission.name)))];
 }
 export function hasPermission(grants: string[], required: string) {
   return grants.some(grant => {
@@ -34,7 +36,7 @@ export function hasPermission(grants: string[], required: string) {
     return resource === subject && (action === '*' || action === 'manage');
   });
 }
-export function safeRedirect(value: string | null, fallback = '/') {
+export function safeRedirect(value: string | null, fallback = ADMIN_HOME) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || /[\\\r\n]/.test(value)) return fallback;
   return value;
 }

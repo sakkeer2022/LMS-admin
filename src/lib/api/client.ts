@@ -1,6 +1,5 @@
 "use client";
 import { ApiError, type ApiEnvelope } from "./contracts";
-import { hasDevAdminSession } from '@/lib/auth/dev-admin';
 const base = "/api/v1";
 let csrf: Promise<string> | undefined;
 let refreshing: Promise<void> | undefined;
@@ -59,7 +58,6 @@ export async function api<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<Extract<ApiEnvelope<T>, { success: true }>> {
-  if (hasDevAdminSession()) throw new ApiError(403, 'Development session: live data is unavailable. Sign out and use a real account to access backend data.');
   if (!/^\/[a-z0-9][a-z0-9/_?=&%.:-]*$/i.test(path) || path.includes(".."))
     throw new Error("Invalid API path");
   const headers = new Headers(init.headers);
@@ -77,7 +75,7 @@ export async function api<T>(
   let response = await send();
   if (
     response.status === 401 &&
-    !/^\/auth\/(login|register|refresh|logout)/.test(path)
+    !/^\/auth\/([a-z]+\/login|refresh|logout|recovery)/.test(path)
   ) {
     await sharedRefresh();
     response = await send();

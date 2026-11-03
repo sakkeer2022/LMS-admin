@@ -19,7 +19,7 @@ describe('HTTP authentication contract', () => {
     const fetchMock = vi.fn(async (url: string) => url.endsWith('/auth/csrf-token') ? response(200, { success: true, data: { csrfToken: 'csrf' } }) : response(422, { success: false, message: 'Validation failed', errors: { email: ['Invalid email'] }, traceId: 'trace-1' }));
     vi.stubGlobal('fetch', fetchMock);
     const { api } = await import('../src/lib/api/client');
-    await expect(api('/auth/login', { method: 'POST', body: '{}' })).rejects.toMatchObject({ status: 422, fields: { email: ['Invalid email'] }, traceId: 'trace-1' });
+    await expect(api('/auth/admin/login', { method: 'POST', body: '{}' })).rejects.toMatchObject({ status: 422, fields: { email: ['Invalid email'] }, traceId: 'trace-1' });
     expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/auth/refresh'))).toBe(false);
   });
 });

@@ -1,32 +1,50 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Card, Typography } from "@/components/ui";
+import Link from "next/link";
 import {
-  Form,
-  TextField,
-  PasswordField,
-  FormError,
-  SubmitButton,
-} from "@/components/ui";
+  LoginCheckbox,
+  LoginField,
+  LoginForm,
+  LoginHeading,
+  LoginSubmit,
+} from "@/components/ui/login-controls";
 
 import { api } from "@/lib/api/client";
-import { loginSchema, registerSchema } from "../schemas/auth";
+import { loginSchema } from "../schemas/auth";
 import { safeRedirect } from "@/lib/auth/access";
 import { ApiError } from "@/lib/api/contracts";
-import { devAdminEnabled, loginDevAdmin, devAdminDashboard } from '@/lib/auth/dev-admin';
 
-export function AuthForm({ register = false }: { register?: boolean }) {
+// One refresh per page load: React strict mode runs effects twice in development, and a second
+// refresh with the already-rotated cookie would be treated as token theft and end the session
+let silentRefresh: Promise<unknown> | undefined;
+
+export function AuthForm() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [fields, setFields] = useState<Record<string, string>>({});
 
   const form = useRef<HTMLFormElement>(null);
   const submitting = useRef(false);
-  const developmentLogin = !register && devAdminEnabled();
-
   useEffect(() => {
     form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
   }, [fields]);
+
+  // The access cookie lasts minutes; a valid refresh cookie signs the person straight back in
+  useEffect(() => {
+    const target = new URLSearchParams(window.location.search).get("redirect");
+    if (!target) return;
+    let cancelled = false;
+    (silentRefresh ??= api("/auth/refresh", { method: "POST" }).finally(() => {
+      setTimeout(() => (silentRefresh = undefined), 5000);
+    }))
+      .then(() => {
+        if (!cancelled) window.location.assign(safeRedirect(target));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,23 +52,12 @@ export function AuthForm({ register = false }: { register?: boolean }) {
     setError("");
     setFields({});
 
-    const values = Object.fromEntries(new FormData(event.currentTarget));
-
-    // The offline preview takes only the bare username; any email goes to the real backend login
-    if (developmentLogin && !String(values.email).includes('@')) {
-      try {
-        if (!loginDevAdmin(String(values.email), String(values.password))) {
-          setError('Invalid development username or password.');
-          return;
-        }
-        window.location.assign(devAdminDashboard);
-      } catch (err) { setError(err instanceof Error ? err.message : 'Development login unavailable.'); }
-      return;
-    }
-
-    const parsed = (register ? registerSchema : loginSchema).safeParse(
-      Object.fromEntries(new FormData(event.currentTarget)),
-    );
+    const data = new FormData(event.currentTarget);
+    const parsed = loginSchema.safeParse({
+      email: data.get("email"),
+      password: data.get("password"),
+      rememberMe: data.get("keepSignedIn") === "on",
+    });
 
     if (!parsed.success) {
       const messages: Record<string, string> = {};
@@ -66,18 +73,16 @@ export function AuthForm({ register = false }: { register?: boolean }) {
     }
 
     submitting.current = true;
-
     setPending(true);
 
     try {
-      await api(`/auth/${register ? "register" : "login"}`, {
+      await api("/auth/admin/login", {
         method: "POST",
         body: JSON.stringify(parsed.data),
       });
       window.location.assign(
         safeRedirect(
           new URLSearchParams(window.location.search).get("redirect"),
-          "/account",
         ),
       );
     } catch (err) {
@@ -98,73 +103,54 @@ export function AuthForm({ register = false }: { register?: boolean }) {
   }
 
   return (
-    <Card>
-      <Typography variant="h1">
-        {register ? "Create your account" : "Welcome back"}
-      </Typography>
-      {developmentLogin && (
-        <Typography tone="muted">
-          Sign in with your account email for live data. Offline UI preview only (no backend
-          data): username admin, password Admin@123.
-        </Typography>
-      )}
-      <Form
-        ref={form}
-        onSubmit={submit}
-        pending={pending}
-        noValidate
-        aria-label={register ? "Create account" : "Sign in"}
-      >
-        {register && (
-          <>
-            <TextField
-              name="firstName"
-              label="First name"
-              autoComplete="given-name"
-              maxLength={100}
-              error={fields.firstName}
-              required
-            />
-            <TextField
-              name="lastName"
-              label="Last name"
-              autoComplete="family-name"
-              maxLength={100}
-              error={fields.lastName}
-              required
-            />
-          </>
-        )}
-        
-        <TextField
+    <LoginForm
+      ref={form}
+      onSubmit={submit}
+      noValidate
+      aria-label="Admin login"
+      pending={pending}
+    >
+      <div>
+        <LoginHeading>Admin login</LoginHeading>
+        <p className="login-subtitle">
+          Sign in to access the Amentorz administration portal.
+        </p>
+      </div>
+      <div className="login-fields">
+        <LoginField
           name="email"
-          label={developmentLogin ? "Email or development username" : "Email"}
-          type={developmentLogin ? "text" : "email"}
-          autoComplete={developmentLogin ? "username" : "email"}
+          label="Email address"
+          type="email"
+          icon="/auth/icon-mail.svg"
+          autoComplete="email"
           error={fields.email}
           required
         />
-        <PasswordField
+        <LoginField
           name="password"
           label="Password"
-          autoComplete={register ? "new-password" : "current-password"}
-          description={
-            register
-              ? "Use 12+ characters including upper/lowercase, a number, and a symbol."
-              : undefined
-          }
+          type="password"
+          icon="/auth/icon-lock.svg"
+          autoComplete="current-password"
           error={fields.password}
+          reveal
           required
         />
-        <FormError message={error} />
-        <SubmitButton pending={pending}>
-          {register ? "Register" : "Sign in"}
-        </SubmitButton>
-      </Form>
-    </Card>
+      </div>
+      {error && (
+        <p className="login-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="login-options">
+        <LoginCheckbox name="keepSignedIn" label="Keep me signed in" />
+        <Link className="login-link" href="/recovery">
+          Forgot password?
+        </Link>
+      </div>
+      <LoginSubmit pending={pending}>
+        {pending ? "Logging in…" : "Log in"}
+      </LoginSubmit>
+    </LoginForm>
   );
 }
-
-
-
-

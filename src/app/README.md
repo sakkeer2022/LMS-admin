@@ -1,15 +1,12 @@
 # Folder routing and shells
 
-Parenthesized route groups isolate layouts but do not contribute URL segments. Distinct visible prefixes prevent collisions:
+Parenthesized route groups isolate layouts but do not contribute URL segments.
 
 | Group | URL | Shell |
 |---|---|---|
-| (auth) | /login, /register, /account, /otp, /recovery, /consent | Narrow authentication canvas |
-| (admin) | /admin/[tenantId]/... | Dense operations navigation |
-| (faculty) | /faculty/[tenantId]/... | Provider workflows |
-| (student) | /student/[tenantId]/... | Discovery and consumption |
-| (session) | /session/[tenantId]/[sessionId] | Full-screen session canvas |
+| (auth) | /login, /recovery | Narrow authentication canvas |
+| (admin) | /admin/... | Dense operations navigation |
 
-Group layouts own presentation. The nested [tenantId] layouts call requirePortal because parent group layouts do not receive child dynamic parameters. All protected shells supply PermissionProvider using verified JWT grants, including inherited permissions. Navigation lives in lib/auth/access.ts. Session rendering has no dashboard sidebar.
+`/` redirects to `/admin/dashboard`. The edge middleware only checks that an access cookie exists and keeps the full destination for sign-in. The admin layout calls `requireAdmin` (`lib/auth/server.ts`), which asks the backend (`GET /auth/me`) who is signed in, requires the admin role and supplies `PermissionProvider` with the user's permissions.
 
-Pages/layouts remain Server Components; put hooks in client leaf components. Keep the root Providers narrowly focused on Query, banners and toasts. error.tsx and loading.tsx provide route fallbacks. Add a portal by following AGENT_GUIDE.md and updating middleware coverage, role mapping, tenant checks and home redirects. Never create two group pages with the same visible URL.
+Pages/layouts remain Server Components; put hooks in client leaf components. Keep the root Providers narrowly focused on Query, banners and toasts. error.tsx and loading.tsx provide route fallbacks. Never create two group pages with the same visible URL.

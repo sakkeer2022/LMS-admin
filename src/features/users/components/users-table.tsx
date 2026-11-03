@@ -10,18 +10,17 @@ import {
 import { usePermission } from "@/components/security/permission-provider";
 import { exportCSV } from "@/lib/exports/download";
 import { useUsers } from "../api/users";
-import { hasDevAdminSession } from '@/lib/auth/dev-admin';
-export function UsersTable({ tenant }: { tenant: string }) {
+export function UsersTable() {
   const allowed = usePermission("user.read");
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const query = useUsers(tenant, { page, limit: 20, search }, allowed);
+  const query = useUsers({ page, limit: 20, search }, allowed);
   if (!allowed) return <FormError message="Requires user.read permission." />;
   return (
     <Card>
       <Typography variant="h1">Platform users</Typography>
       <Typography>
-        Platform-wide administrative data. This endpoint is not tenant-scoped.
+        Platform-wide administrative data.
       </Typography>
       <TextField
         label="Search users"
@@ -35,7 +34,7 @@ export function UsersTable({ tenant }: { tenant: string }) {
       {query.isPending ? (
         <PanelSkeleton />
       ) : query.isError ? (
-        <FormError message={hasDevAdminSession() ? 'Development session: live users are unavailable. Use a real account to load backend data.' : 'Users could not be loaded.'} />
+        <FormError message="Users could not be loaded." />
       ) : (
         <>
           <DataTable
@@ -45,7 +44,7 @@ export function UsersTable({ tenant }: { tenant: string }) {
             {query.data.data.map((user) => (
               <tr key={user.id}>
                 <td>
-                  {user.firstName} {user.lastName}
+                  {user.fullName}
                 </td>
                 <td>{user.email}</td>
                 <td>{user.isActive ? "Active" : "Disabled"}</td>
@@ -67,7 +66,7 @@ export function UsersTable({ tenant }: { tenant: string }) {
                 [
                   ["Name", "Email", "Status"],
                   ...query.data.data.map((u) => [
-                    `${u.firstName} ${u.lastName}`,
+                    u.fullName,
                     u.email,
                     u.isActive ? "Active" : "Disabled",
                   ]),

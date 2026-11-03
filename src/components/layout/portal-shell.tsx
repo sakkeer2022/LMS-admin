@@ -7,28 +7,17 @@ import {
   Typography,
 } from "@/components/ui";
 import { Link } from "@/components/ui/Link";
+import { useMe } from "@/features/auth/api/auth";
 import { api } from "@/lib/api/client";
-import { hasDevAdminSession, logoutDevAdmin } from "@/lib/auth/dev-admin";
-import { portals, type Portal } from "@/lib/auth/access";
-import { adminNavigation, portalBrand } from "@/lib/auth/portal-config";
+import { adminNavigation, portalBrand, portalTitle } from "@/lib/auth/portal-config";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
-  CalendarDays,
-  FileText,
-  Folder,
-  IndianRupee,
-  LayoutDashboard,
   LogOut,
   Menu,
   Moon,
   Search,
-  Settings,
-  Star,
   Sun,
-  UserCheck,
-  Users,
-  Wallet,
   X,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -36,31 +25,17 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AdminHeader } from "./admin/AdminHeader";
 import { AdminPageContainer } from "./admin/AdminPageContainer";
 import { AdminSidebar } from "./admin/AdminSidebar";
-import { isNavigationActive } from "./admin/navigation";
-const icons = {
-  dashboard: LayoutDashboard,
-  users: Users,
-  faculty: UserCheck,
-  folder: Folder,
-  money: IndianRupee,
-  calendar: CalendarDays,
-  star: Star,
-  file: FileText,
-  wallet: Wallet,
-  settings: Settings,
-};
-export function PortalShell({
-  portal,
-  tenant,
-  children,
-}: {
-  portal: Portal;
-  tenant: string;
-  children: ReactNode;
-}) {
+// Up to two letters from the person's name; a neutral mark until it has loaded
+function initialsOf(name?: string) {
+  const words = name?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (words.length === 0) return "•";
+  return (words[0]![0]! + (words.length > 1 ? words[words.length - 1]![0]! : "")).toUpperCase();
+}
+export function PortalShell({ children }: { children: ReactNode }) {
   const pathname = usePathname(),
    client = useQueryClient();
-  const base = `/${portal}/${encodeURIComponent(tenant)}`;
+  const base = "/admin";
+  const initials = initialsOf(useMe().data?.data.fullName);
   const [collapsed, setCollapsed] = useState(false),
     [mobile, setMobile] = useState(false),
     [search, setSearch] = useState(""),
@@ -69,19 +44,7 @@ export function PortalShell({
     [error, setError] = useState("");
   const toggle = useRef<HTMLButtonElement>(null),
     aside = useRef<HTMLElement>(null);
-  const groups =
-    portal === "admin"
-      ? adminNavigation
-      : [
-          {
-            label: portals[portal].title,
-            items: portals[portal].links.map(([title, suffix]) => [
-              title,
-              suffix,
-              "dashboard",
-            ]),
-          },
-        ];
+  const groups = adminNavigation;
   useEffect(() => {
     const saved = localStorage.getItem("amentorz-theme") === "dark";
     setDark(saved);
@@ -131,8 +94,7 @@ export function PortalShell({
   async function logout() {
     setLoggingOut(true);
     try {
-      if (hasDevAdminSession()) logoutDevAdmin();
-      else await api("/auth/logout", { method: "POST" });
+      await api("/auth/logout", { method: "POST" });
       client.clear();
       window.location.assign("/login");
     } catch {
@@ -179,60 +141,19 @@ export function PortalShell({
         >
           <X size={18} />
         </Button>
-        {portal === "admin" ? (
-          <AdminSidebar
-            base={base}
-            onNavigate={() => {
-              setMobile(false);
-            }}
-          />
-        ) : (
-          <nav aria-label={`${portal} navigation`}>
-            {groups.map((group) => (
-              <div className="sidebar-group" key={group.label}>
-                <Typography
-                  variant="caption"
-                  component="p"
-                  tone="muted"
-                  className="group-label"
-                >
-                  {group.label}
-                </Typography>
-                {group.items.map(([title, suffix, icon]) => {
-                  const Icon = icons[icon as keyof typeof icons] ?? FileText;
-                  return (
-                    <Link
-                      title={title}
-                      className="nav-item"
-                      aria-current={
-                        (
-                          suffix
-                            ? isNavigationActive(pathname, base + suffix)
-                            : pathname === base
-                        )
-                          ? "page"
-                          : undefined
-                      }
-                      href={base + suffix}
-                      key={title}
-                      onClick={() => setMobile(false)}
-                    >
-                      <Icon size={18} />
-                      <span>{title}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
-          </nav>
-        )}
+        <AdminSidebar
+          base={base}
+          onNavigate={() => {
+            setMobile(false);
+          }}
+        />
         <div className="sidebar-account">
-          <Link href="/account" className="account-link">
-            <span className="avatar">AC</span>
+          <Link href="/admin/profile" className="account-link">
+            <span className="avatar">{initials}</span>
             <span>
-              My account
+              My profile
               <Typography variant="inherit" component="small" tone="muted">
-                {portals[portal].title}
+                {portalTitle}
               </Typography>
             </span>
           </Link>
@@ -266,7 +187,6 @@ export function PortalShell({
           >
             <Menu size={18} />
           </Button>
-          {/* {portal === "admin" && <AdminHeader base={base} />} */}
           <div className="navigation-search">
             {/* <Search size={15} /> */}
             <TextField
@@ -323,18 +243,12 @@ export function PortalShell({
             <Disclosure
               className="header-menu"
               label="Notifications"
-              summary={
-                <>
-                  <Bell size={18} />
-                  <span className="notification-dot" />
-                </>
-              }
+              summary={<Bell size={18} />}
             >
               <div className="popover">
                 <strong>Notifications</strong>
                 <Typography tone="muted">
-                  No connected notification feed. Operational demo alerts are
-                  available on the dashboard.
+                  No notifications yet.
                 </Typography>
                 <Link href={base}>Open dashboard</Link>
               </div>
@@ -342,10 +256,10 @@ export function PortalShell({
             <Disclosure
               className="header-menu"
               label="User menu"
-              summary={<span className="avatar">AC</span>}
+              summary={<span className="avatar">{initials}</span>}
             >
               <div className="popover">
-                <Link href="/account">Account & sessions</Link>
+                <Link href="/admin/profile">My profile</Link>
                 <Button
                   pending={loggingOut}
                   pendingLabel="Signing out…"
@@ -358,11 +272,7 @@ export function PortalShell({
           </div>
         </header>
         <FormError message={error} />
-        {portal === "admin" ? (
-          <AdminPageContainer>{children}</AdminPageContainer>
-        ) : (
-          <main id="main">{children}</main>
-        )}
+        <AdminPageContainer>{children}</AdminPageContainer>
       </div>
     </div>
   );
