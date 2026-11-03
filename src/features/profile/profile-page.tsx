@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Form } from "@/components/ui/Form";
+import { PageHeader } from "@/components/layout/page-header";
 import {
-  PageHeader,
   SettingButton,
   SettingCallout,
   SettingCard,
   SettingEmpty,
+  SettingForm,
   SettingInput,
   SettingPill,
   SettingPills,
@@ -14,7 +14,7 @@ import {
   SettingSelect,
   SettingsPage,
   StickyBar,
-} from "@/components/ui/settings-layout";
+} from "@/components/settings/setting-layout";
 import {
   useActivity,
   useLogout,
@@ -61,8 +61,8 @@ export function ProfilePage() {
   const user = me.data?.data;
   const format = useFormatter(user?.timezone);
 
-  if (me.isPending) return <p role="status">Loading your profile…</p>;
-  if (me.isError || !user) return <p role="alert">Please sign in again.</p>;
+  if (me.isPending) return <p role="status" className="text-sm text-muted-foreground">Loading your profile…</p>;
+  if (me.isError || !user) return <p role="alert" className="text-sm text-error-foreground">Please sign in again.</p>;
 
   return (
     <SettingsPage>
@@ -142,11 +142,10 @@ function DetailsCard() {
   }
 
   return (
-    <Form
+    <SettingForm
       onSubmit={submit}
       noValidate
       aria-label="Personal details"
-      className="sp-form"
       pending={update.isPending}
     >
       <SettingCard
@@ -247,7 +246,7 @@ function DetailsCard() {
           Save changes
         </SettingButton>
       </StickyBar>
-    </Form>
+    </SettingForm>
   );
 }
 

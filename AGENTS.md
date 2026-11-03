@@ -31,7 +31,7 @@ This repo is one of four: `amentorz-backend` (Express 5, Prisma 7, PostgreSQL AP
 - The UI design is final. A change must not alter what a screen shows or collects. If it would, raise it as a pending decision (`amentorz-backend/docs/PENDING_DECISIONS.md`) instead.
 - Theme, tokens and components come from the approved design. Do not invent styles.
 - India (`IN`) and the UAE (`AE`) are both in scope. Never hard-code a country, dialling code, time zone, currency or age rule; follow `amentorz-backend/src/docs/REGIONS.md`. All money is INR.
-- Check `src/components/ui` and `src/lib` before writing a helper or a component, and reuse what exists.
+- Check `src/components/shadcn`, `src/components/layout` and `src/lib` before writing a helper or a component, and reuse what exists.
 - Do not start the LMS-99 email and OTP work without asking.
 
 ## Engineering

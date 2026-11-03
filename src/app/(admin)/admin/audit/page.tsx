@@ -1,9 +1,14 @@
-import { ExtensionPanel } from "@/components/ui/extension-panel";
+import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
+
 export default function Page() {
   return (
-    <ExtensionPanel
-      title="Audit logs"
-      description="Connect the audit.read protected endpoint. Do not log sensitive payloads in the browser."
-    />
+    <>
+      <PageHeader title="Audit logs" />
+      <EmptyState
+        title="Not available yet"
+        description="Audit logs appear here once the audit.read endpoint is connected."
+      />
+    </>
   );
 }

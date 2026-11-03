@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { Toaster, toast } from "sonner";
 import { ApiError } from "@/lib/api/contracts";
+import { TooltipProvider } from "@/components/shadcn/tooltip";
 import { BannerProvider } from "@/components/feedback/banner-provider";
 function report(error: Error) {
   toast.error(
@@ -35,7 +36,9 @@ export function Providers({ children }: { children: ReactNode }) {
   );
   return (
     <QueryClientProvider client={client}>
-      <BannerProvider>{children}</BannerProvider>
+      <TooltipProvider delayDuration={200}>
+        <BannerProvider>{children}</BannerProvider>
+      </TooltipProvider>
       <Toaster richColors />
     </QueryClientProvider>
   );

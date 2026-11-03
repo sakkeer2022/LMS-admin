@@ -1,17 +1,23 @@
 "use client";
-import { SelectField } from "@/components/ui";
-import { Button, Badge, Typography } from "@/components/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Badge } from "@/components/shadcn/badge";
+import { Button } from "@/components/shadcn/button";
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
 import {
-  PanelMessage,
-  PageHeader,
-  SectionCard,
-  DataTable,
-  StatusBadge,
-  TablePagination,
-  PanelSkeleton,
-} from "@/components/ui/dashboard-ui";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/shadcn/tabs";
+import { DataTable } from "@/components/data-table/data-table";
+import { TablePagination } from "@/components/data-table/table-pagination";
+import { PageHeader } from "@/components/layout/page-header";
+import { PanelMessage } from "@/components/layout/panel-message";
+
 const tutors = [
   [
     "Anjali Deshpande",
@@ -77,11 +83,62 @@ const tutors = [
     "Suspended",
   ],
 ];
+
+type Tutor = (typeof tutors)[number];
+
+const statusVariant = {
+  Pending: "warning",
+  Verified: "info",
+  Published: "success",
+  Suspended: "destructive",
+} as const;
+
+const columns: ColumnDef<Tutor>[] = [
+  {
+    id: "tutor",
+    header: "Tutor",
+    cell: ({ row }) => (
+      <div className="flex flex-col">
+        <strong className="font-semibold">{row.original[0]}</strong>
+        <small className="text-xs text-muted-foreground">{row.original[1]}</small>
+      </div>
+    ),
+  },
+  { id: "subjects", header: "Subjects", accessorFn: (t) => t[2] },
+  {
+    id: "qualification",
+    header: "Qualification",
+    accessorFn: (t) => t[3],
+    cell: ({ getValue }) => <span className="text-text-secondary">{getValue<string>()}</span>,
+  },
+  { id: "documents", header: "Documents", accessorFn: (t) => t[4] },
+  {
+    id: "applied",
+    header: "Applied",
+    accessorFn: (t) => t[5],
+    cell: ({ getValue }) => <span className="text-text-secondary">{getValue<string>()}</span>,
+  },
+  {
+    id: "status",
+    header: "Status",
+    accessorFn: (t) => t[6],
+    cell: ({ getValue }) => (
+      <Badge variant={statusVariant[getValue<string>() as keyof typeof statusVariant]}>
+        {getValue<string>()}
+      </Badge>
+    ),
+  },
+];
+
+const FILTERS = ["", "Pending", "Verified", "Published", "Suspended"];
+const SUBJECTS = ["Physics", "Mathematics", "Chemistry", "Biology", "English"];
+const ALL = "all";
+
 export function FacultyDirectory() {
-  const params = useSearchParams(),
-    router = useRouter();
-  const status = params.get("filter") ?? "",
-    subject = params.get("subject") ?? "";
+  const params = useSearchParams();
+  const router = useRouter();
+  const status = params.get("filter") ?? "";
+  const subject = params.get("subject") ?? "";
   const page = Math.max(1, Number(params.get("page")) || 1);
   const query = useQuery({
     queryKey: ["faculty-demo", { status, subject, page }],
@@ -104,112 +161,69 @@ export function FacultyDirectory() {
     <>
       <PageHeader
         title="Faculty"
-        subtitle="Tutor profiles · document screening and category assignment"
-        action={
-          <Button variant="primary" onClick={() => {}}>
-            Invite tutor
-          </Button>
-        }
+        description="Tutor profiles · document screening and category assignment"
+        actions={<Button onClick={() => {}}>Invite tutor</Button>}
       />
-      {/* <Typography
-        variant="caption"
-        component="p"
-        tone="muted"
-        className="demo-notice"
-      >
-        Development data · invitations and verification require a backend
-        adapter
-      </Typography> */}
-      <div className="directory-tabs" aria-label="Faculty status filters">
-        {["", "Pending", "Verified", "Published", "Suspended"].map((s) => (
-          <Button
-            variant="tab"
-            key={s}
-            aria-pressed={status === s}
-            onClick={() => update({ filter: s, page: "1" })}
-          >
-            {s || "All profiles"}{" "}
-            <Badge>
-              {s ? tutors.filter((t) => t[6] === s).length : tutors.length}
-            </Badge>
-          </Button>
-        ))}
-      </div>
-      <SectionCard
-        title="Onboarding queue"
-        subtitle="Screening, document verification and category assignment"
-        action={
-          <SelectField
-            label="Filter subject"
-            value={subject}
-            onChange={(e) => update({ subject: e.target.value, page: "1" })}
-          >
-            <option value="">All categories</option>
-            {["Physics", "Mathematics", "Chemistry", "Biology", "English"].map(
-              (s) => (
-                <option key={s}>{s}</option>
-              ),
-            )}
-          </SelectField>
-        }
-      >
-        {query.isPending ? (
-          <PanelSkeleton rows={7} />
-        ) : query.isError ? (
-          <PanelMessage onRetry={() => void query.refetch()}>
-            Faculty data unavailable.
-          </PanelMessage>
-        ) : (
-          <>     
-            <DataTable
-              headers={[
-                "Tutor",
-                "Subjects",
-                "Qualification",
-                "Documents",
-                "Applied",
-                "Status",
-              ]}
-              caption="Demonstration faculty onboarding queue"
+      <Tabs value={status || ALL} onValueChange={(v) => update({ filter: v === ALL ? "" : v, page: "1" })}>
+        <TabsList aria-label="Faculty status filters">
+          {FILTERS.map((s) => (
+            <TabsTrigger key={s || ALL} value={s || ALL} className="gap-2">
+              {s || "All profiles"}
+              <Badge variant="secondary">
+                {s ? tutors.filter((t) => t[6] === s).length : tutors.length}
+              </Badge>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Onboarding queue</CardTitle>
+          <CardDescription>Screening, document verification and category assignment</CardDescription>
+          <CardAction>
+            <Select
+              value={subject || ALL}
+              onValueChange={(v) => update({ subject: v === ALL ? "" : v, page: "1" })}
             >
-              {query.data.rows.map((t) => (
-                <tr key={t[1]}>
-                  <td>
-                    <strong className="cell-strong">{t[0]}</strong>
-                    <Typography
-                      variant="caption"
-                      component="small"
-                      tone="muted"
-                      className="tutor-email"
-                    >
-                      {t[1]}
-                    </Typography>
-                  </td>
-                  <td>{t[2]}</td>
-                  <td className="muted">{t[3]}</td>
-                  <td>{t[4]}</td>
-                  <td className="muted">{t[5]}</td>
-                  <td>
-                    <StatusBadge status={t[6]} />
-                  </td>
-                </tr>
-              ))}
-            </DataTable>
-
-            {!query.data.rows.length && (
-              <PanelMessage>No tutors match these filters.</PanelMessage>
-            )}
-
-            <TablePagination
-              page={page}
-              limit={7}
-              total={query.data.total}
-              onPage={(p) => update({ page: String(p) })}
+              <SelectTrigger aria-label="Filter subject" className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All categories</SelectItem>
+                {SUBJECTS.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardAction>
+        </CardHeader>
+        {query.isError ? (
+          <PanelMessage onRetry={() => void query.refetch()}>Faculty data unavailable.</PanelMessage>
+        ) : (
+          <>
+            <DataTable
+              caption="Demonstration faculty onboarding queue"
+              columns={columns}
+              data={query.data?.rows ?? []}
+              getRowId={(t) => t[1]}
+              loading={query.isPending}
+              loadingRows={7}
+              empty="No tutors match these filters."
             />
-
+            {query.data && (
+              <TablePagination
+                page={page}
+                limit={7}
+                total={query.data.total}
+                noun="tutors"
+                onPage={(p) => update({ page: String(p) })}
+              />
+            )}
           </>
         )}
-      </SectionCard>
+      </Card>
     </>
   );
 }
