@@ -216,14 +216,13 @@ export async function dashboardRead<P extends Panel>(
 
 // React Query hook
 export function useDashboard<P extends Panel>(
-  tenant: string,
   panel: P,
   page = 1,
   status = "",
   state: DemoState = "ready",
 ) {
   return useQuery<DashboardData[P], Error>({
-    queryKey: ["dashboard-demo", tenant, panel, { page, status, state }],
+    queryKey: ["dashboard-demo", panel, { page, status, state }],
     queryFn: ({ signal }) =>
       dashboardRead(panel, {
         page,

@@ -1,5 +1,5 @@
 {
-  "name": "multi-portal-frontend",
+  "name": "amentorz-admin",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,10 +14,10 @@
   },
   "dependencies": {
     "next": "^15.5.0",
+    "jose": "^6.2.15",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "@tanstack/react-query": "^5.90.0",
-    "jose": "^6.1.0",
     "zod": "^4.1.0",
     "lucide-react": "^0.468.0",
     "sonner": "^2.0.0"

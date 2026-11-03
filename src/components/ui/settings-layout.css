@@ -1,0 +1,250 @@
+@import "../../styles/figma-tokens.css";
+/* Settings-style page: header, cards of rows, sticky save bar (Figma "Content", node 207:6913) */
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  color: var(--text-primary);
+}
+.sp-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.sp-header-copy {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sp-title {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 32px;
+  letter-spacing: -0.12px;
+}
+.sp-lede {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+.sp-card {
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  box-shadow: var(--elevation-1);
+}
+.sp-card-header {
+  padding: 20px 32px 8px;
+}
+.sp-card-title {
+  margin: 0 0 2px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 26px;
+}
+.sp-card-caption {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 16px;
+}
+.sp-card-body {
+  padding: 0 32px 12px;
+}
+.sp-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.sp-row:last-child {
+  border-bottom: 0;
+}
+.sp-row-copy {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sp-row-label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.sp-row-description {
+  margin: 2px 0 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+.sp-row-control {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 320px;
+  max-width: 100%;
+}
+.sp-input {
+  width: 100%;
+  height: 40px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+.sp-input:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: 1px;
+}
+.sp-input[readonly] {
+  background: var(--border-subtle);
+  color: var(--text-secondary);
+}
+.sp-input[aria-invalid="true"] {
+  border-color: var(--text-error);
+}
+.sp-field-error {
+  margin: 4px 0 0;
+  color: var(--text-error);
+  font-size: 12px;
+  line-height: 16px;
+}
+.sp-btn {
+  display: inline-flex;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-default);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.sp-btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.sp-btn--primary {
+  background: var(--action-primary);
+  color: var(--text-on-brand);
+}
+.sp-btn--secondary {
+  border-color: var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+.sp-btn--ghost {
+  color: var(--text-brand);
+}
+.sp-btn--sm {
+  height: 32px;
+  padding: 0 12px;
+}
+.sp-pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--bg-brand-subtle);
+  color: var(--text-brand);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+.sp-pill--warning {
+  background: var(--bg-warning-subtle);
+  color: var(--text-warning);
+}
+.sp-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.sp-callout {
+  margin-top: 4px;
+  margin-bottom: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-warning);
+  border-radius: var(--radius-default);
+  background: var(--bg-warning-subtle);
+  color: var(--text-warning);
+  font-size: 14px;
+  line-height: 20px;
+}
+.sp-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  box-shadow: var(--elevation-1);
+  position: sticky;
+  bottom: 16px;
+}
+.sp-bar-text {
+  flex: 1 1 0;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+.sp-empty {
+  margin: 0;
+  padding: 16px 0;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+@media (max-width: 700px) {
+  .sp-card-header {
+    padding: 16px 16px 8px;
+  }
+  .sp-card-body {
+    padding: 0 16px 8px;
+  }
+  .sp-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .sp-row-control {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .sp-pills {
+    justify-content: flex-start;
+  }
+  .sp-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sp-bar {
+    flex-wrap: wrap;
+    padding: 12px 16px;
+  }
+}
+.sp-form .ui-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}

@@ -1,0 +1,23 @@
+/* Colour, radius and shadow tokens from the Figma "Webapplication" file (foundations). Scoped to the
+   screens built from it; the rest of the admin keeps its current theme until the team decides otherwise. */
+.login,
+.settings-page {
+  --bg-surface: #fff;
+  --bg-brand-subtle: #f5eaf5;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --text-brand: #562b7a;
+  --text-error: #991b1b;
+  --text-on-brand: #fff;
+  --border-default: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --action-primary: #913d95;
+  --radius-default: 6px;
+  --border-subtle: #f1f5f9;
+  --bg-warning-subtle: #fef3c7;
+  --border-warning: #d97706;
+  --text-warning: #92400e;
+  --elevation-1: 0 1px 2px rgba(15, 23, 42, 0.06);
+  font-family: var(--font-manrope), system-ui, sans-serif;
+}

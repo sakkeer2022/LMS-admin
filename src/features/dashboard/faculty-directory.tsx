@@ -2,7 +2,7 @@
 import { SelectField } from "@/components/ui";
 import { Button, Badge, Typography } from "@/components/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   PanelMessage,
   PageHeader,
@@ -78,14 +78,13 @@ const tutors = [
   ],
 ];
 export function FacultyDirectory() {
-  const { tenantId } = useParams<{ tenantId: string }>();
   const params = useSearchParams(),
     router = useRouter();
   const status = params.get("filter") ?? "",
     subject = params.get("subject") ?? "";
   const page = Math.max(1, Number(params.get("page")) || 1);
   const query = useQuery({
-    queryKey: ["faculty-demo", tenantId, { status, subject, page }],
+    queryKey: ["faculty-demo", { status, subject, page }],
     queryFn: async () => {
       const rows = tutors.filter(
         (t) =>

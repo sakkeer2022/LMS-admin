@@ -1,31 +1,29 @@
-# Multi-portal frontend starter
+# Amentorz admin
 
-Next.js App Router baseline aligned with the adjacent Express RBAC service. Read [backend findings](BACKEND_ANALYSIS.md), [architecture and directory blueprint](AGENT_GUIDE.md), and [copy-paste prompts](PROMPT_TEMPLATES.md).
+Admin portal for the Amentorz platform: Next.js 15 (App Router), React 19, TypeScript, Tailwind 4, TanStack Query, Zod 4. There is no tenancy: one platform, one admin portal. Students and faculty have their own apps (`amentorz-student`, `amentorz-faculty`).
+
+Read [AGENTS.md](AGENTS.md) (rules for every contributor and AI agent), [CLAUDE.md](CLAUDE.md) and [AGENT_GUIDE.md](AGENT_GUIDE.md) (architecture) before changing code.
 
 ## Run
 
-```powershell
-cd frontend
+```bash
 npm ci
-Copy-Item .env.example .env.local
-# Set JWT_SECRET to exactly match the backend access-token secret (32+ characters).
-npm run dev
+cp .env.example .env.local   # BACKEND_ORIGIN points at the API (default http://127.0.0.1:3000)
+npm run dev                  # http://localhost:3001
 ```
 
-Frontend runs on http://localhost:3001; backend defaults to http://127.0.0.1:3000. The Next /api/v1 rewrite keeps cookies same-origin. Restart after changing gateway configuration. Never expose secrets with NEXT_PUBLIC_.
+The backend (`amentorz-backend`) must allow `http://localhost:3001` in `ALLOWED_ORIGINS` (the local default does). The Next `/api/v1` rewrite keeps the auth cookies same-origin.
 
-```powershell
+```bash
 npm run typecheck
 npm test
 npm run build
 ```
 
-The landing page and auth pages render immediately. Backend integration requires a running PostgreSQL/Redis service and backend startup fixes described in BACKEND_ANALYSIS.md. Tenant portals intentionally deny access until the backend adds signed tenantIds membership claims and tenant resource authorization. Password auth exists; OTP, guardian consent and marketplace operations are explicit extension screens.
+## Sign-in
 
-The scaffold generator is retained as scaffold.cjs for traceability. It was used once to create route skeletons; do not rerun it over customized pages because it overwrites generated files.
+`/login` signs in through `POST /auth/admin/login`. Only accounts with the admin role (the backend also lets `super_admin` in) reach `/admin/...`. The admin layout checks the session with `GET /auth/me` on the server; no secret is shared with the backend. `/admin/profile` is the admin's own profile (details, access, devices, activity; backed by `PUT /admin/me/profile` and `GET /admin/me/activity`). Password recovery (`/recovery`) is a placeholder until the backend recovery endpoints exist (LMS-99 and LMS-100).
 
-Next 15 was selected to implement the requested Edge middleware.ts convention. Official references: [Next 15 middleware](https://nextjs.org/docs/15/app/getting-started/route-handlers-and-middleware), [route groups](https://nextjs.org/docs/15/app/api-reference/file-conventions/route-groups). This is a high-level baseline, with deployment/integration work called out in the architecture guide.
+## UI
 
-## Reference dashboard UI
-
-The shared shell and admin dashboard now use the Amentorz visual system. See [UI implementation and adapter contract](UI_IMPLEMENTATION.md) for fixtures, URL filters, state testing, theme configuration and integration limitations.
+The dashboard and faculty directory use the development adapter in `src/features/dashboard/adapter.ts`; see [UI_IMPLEMENTATION.md](UI_IMPLEMENTATION.md). Shared components are in `src/components/ui`; see its README.
