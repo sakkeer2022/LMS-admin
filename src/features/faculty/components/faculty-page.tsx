@@ -174,11 +174,11 @@ export function FacultyPage({ tenant }: { tenant: string }) {
               <Typography variant="body2" tone="muted">
                 {emptyMessage(filters)}
               </Typography>
-              {filters.tab === "all" && !filters.search && !filters.categoryId && canInvite && (
+              {/* {filters.tab === "all" && !filters.search && !filters.categoryId && canInvite && (
                 <Button variant="primary" size="sm" onClick={() => setInviteOpen(true)}>
                   Invite tutor
                 </Button>
-              )}
+              )} */}
             </div>
           ) : (
             <div aria-busy={roster.isFetching || undefined} className={roster.isPlaceholderData ? "faculty-refreshing" : undefined}>
