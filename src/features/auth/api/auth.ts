@@ -33,3 +33,9 @@ export function useUpdateProfile() {
     onSuccess: (response) => { client.setQueryData(authKeys.me(), response); client.invalidateQueries({ queryKey: [...authKeys.all, 'activity'] }); },
   });
 }
+export interface PasswordChangeInput { currentPassword: string; newPassword: string; challengeId: string; otp: string }
+export interface CodeChallenge { challengeId: string; expiresAt: string; resendAfter: string }
+// Emails a code to the signed-in account's own address (no email is sent in the request)
+export function useRequestChangeCode() { return useMutation({ mutationFn: () => api<CodeChallenge>('/auth/password/requests', { method: 'POST' }) }); }
+// The backend ends every session on success, including this one
+export function useChangePassword() { return useMutation({ mutationFn: (input: PasswordChangeInput) => api<null>('/auth/password', { method: 'PUT', body: JSON.stringify(input) }) }); }

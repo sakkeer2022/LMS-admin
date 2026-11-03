@@ -1,9 +1,7 @@
-import { ExtensionPanel } from "@/components/ui/extension-panel";
-export default function Page() {
-  return (
-    <ExtensionPanel
-      title="Password recovery"
-      description="Backend support is required. This extension has no active submission flow until an approved endpoint and validation contract exist."
-    />
-  );
+import { RecoveryFlow } from "@/features/auth/components/recovery-flow";
+
+export const metadata = { title: "Reset your password" };
+
+export default function Recovery() {
+  return <RecoveryFlow portal="admin" />;
 }

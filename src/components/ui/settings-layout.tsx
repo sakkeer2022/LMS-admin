@@ -1,5 +1,14 @@
 "use client";
-import { forwardRef, type ComponentProps, type ReactNode } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import {
+  forwardRef,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import "./settings-layout.css";
 
 /* Settings-style building blocks from the Figma Settings content (node 207:6913).
@@ -183,6 +192,124 @@ export function StickyBar({
       <p className="sp-bar-text" role="status">
         {message}
       </p>
+      {children}
+    </div>
+  );
+}
+
+/** A password input with a show/hide toggle. */
+export const SettingPasswordInput = forwardRef<
+  HTMLInputElement,
+  Omit<ComponentProps<"input">, "type"> & { error?: string }
+>(function SettingPasswordInput({ error, ...props }, ref) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="sp-password">
+      <SettingInput
+        {...props}
+        ref={ref}
+        error={error}
+        type={visible ? "text" : "password"}
+        className="sp-password__input"
+      />
+      <button
+        type="button"
+        className="sp-password__toggle"
+        aria-label={visible ? "Hide password" : "Show password"}
+        aria-pressed={visible}
+        onClick={() => setVisible((value) => !value)}
+      >
+        {visible ? (
+          <EyeOff size={18} aria-hidden />
+        ) : (
+          <Eye size={18} aria-hidden />
+        )}
+      </button>
+    </div>
+  );
+});
+
+/** A modal dialog in the settings style: icon, title, description, content and a footer for actions. */
+export function SettingDialog({
+  open,
+  onClose,
+  title,
+  description,
+  icon,
+  footer,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description: string;
+  icon: ReactNode;
+  footer: ReactNode;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const close = useRef(onClose);
+  close.current = onClose;
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (open && !dialog.open) {
+      const previous = document.activeElement as HTMLElement | null;
+      dialog.showModal();
+      return () => {
+        dialog.close();
+        previous?.focus();
+      };
+    }
+  }, [open]);
+
+  return (
+    <dialog
+      ref={ref}
+      className="sp-dialog"
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault();
+        close.current();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) close.current();
+      }}
+    >
+      <div className="sp-dialog__panel">
+        <div className="sp-dialog__head">
+          <span className="sp-dialog__icon">{icon}</span>
+          <div>
+            <h2 id={titleId} className="sp-dialog__title">
+              {title}
+            </h2>
+            <p className="sp-dialog__description">{description}</p>
+          </div>
+        </div>
+        <div className="sp-dialog__body">{children}</div>
+        {footer && <div className="sp-dialog__footer">{footer}</div>}
+      </div>
+    </dialog>
+  );
+}
+
+/** A label above a control, for stacked forms such as the dialog. */
+export function SettingField({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="sp-field">
+      <label className="sp-field__label" htmlFor={htmlFor}>
+        {label}
+      </label>
       {children}
     </div>
   );

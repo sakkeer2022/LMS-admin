@@ -22,7 +22,7 @@ npm run build
 
 ## Sign-in
 
-`/login` signs in through `POST /auth/admin/login`. Only accounts with the admin role (the backend also lets `super_admin` in) reach `/admin/...`. The admin layout checks the session with `GET /auth/me` on the server; no secret is shared with the backend. `/admin/profile` is the admin's own profile (details, access, devices, activity; backed by `PUT /admin/me/profile` and `GET /admin/me/activity`). Password recovery (`/recovery`) is a placeholder until the backend recovery endpoints exist (LMS-99 and LMS-100).
+`/login` signs in through `POST /auth/admin/login`. Only accounts with the admin role (the backend also lets `super_admin` in) reach `/admin/...`. The admin layout checks the session with `GET /auth/me` on the server; no secret is shared with the backend. `/admin/profile` is the admin's own profile (details, access, devices, activity; backed by `PUT /admin/me/profile` and `GET /admin/me/activity`). Forgot password (`/recovery`, Figma 427:4388, 427:4492, 427:29259) is one page with four steps: email, code, new password, done. It uses `POST /auth/recovery/requests`, `/verify` and `/reset`; the reset credential lives only in component state, never in a URL or storage. The code step has no frame yet (see the backend `docs/PENDING_DECISIONS.md`, P8). The profile's "Change password" opens a two-step dialog: the passwords first, then a code emailed to the account's own address (`POST /auth/password/requests`), sent with the passwords to `PUT /auth/password`. The backend ends every session, so it then goes to `/login`.
 
 ## UI
 

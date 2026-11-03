@@ -248,3 +248,166 @@
   flex-direction: column;
   gap: 24px;
 }
+
+/* Password input with the show/hide toggle */
+.sp-password {
+  position: relative;
+  width: 100%;
+}
+.sp-password__input {
+  padding-right: 44px;
+}
+.sp-password__toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.sp-password__toggle:hover {
+  color: var(--text-primary);
+}
+
+/* Dialog */
+.sp-dialog {
+  /* Tailwind's reset zeroes the margin that centres a modal dialog */
+  margin: auto;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+}
+.sp-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+.sp-dialog[open] {
+  animation: sp-dialog-in 0.18s ease-out;
+}
+@keyframes sp-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-dialog[open] {
+    animation: none;
+  }
+}
+.sp-dialog__panel {
+  display: flex;
+  flex-direction: column;
+}
+.sp-dialog__head {
+  display: flex;
+  gap: 16px;
+  padding: 24px 24px 8px;
+}
+.sp-dialog__icon {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--bg-brand-subtle);
+  color: var(--text-brand);
+}
+.sp-dialog__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  line-height: 26px;
+}
+.sp-dialog__description {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+.sp-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 24px 8px;
+}
+.sp-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px 24px;
+}
+.sp-dialog__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sp-field__label {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.sp-checklist {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 14px;
+  list-style: none;
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas, #f8fafc);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+}
+.sp-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sp-checklist li[data-met="true"] {
+  color: var(--text-success, #166534);
+}
+.sp-dialog__error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-default);
+  background: var(--bg-error-subtle, #fee2e2);
+  color: var(--text-error);
+  font-size: 14px;
+  line-height: 20px;
+}
+.sp-dialog__done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 0 16px;
+  text-align: center;
+}
+.sp-dialog__done .sp-dialog__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--bg-success-subtle, #dcfce7);
+  color: var(--text-success, #166534);
+}
