@@ -285,18 +285,24 @@
   padding: var(--space-2);
   flex-shrink: 0;
 }
-.ui-button--tab {
+.ui-button--tab,
+.ui-button--tab:hover:not(:disabled),
+.ui-button--tab:focus,
+.ui-button--tab:active {
   border: 0;
   border-bottom: var(--focus-width) solid transparent;
   border-radius: 0;
   background: transparent;
   color: var(--muted);
   padding: var(--space-3);
+  box-shadow: none;
 }
-.ui-button--tab[aria-pressed="true"] {
+
+.ui-button--tab[aria-selected="true"] {
   color: var(--accent);
   border-bottom-color: var(--accent);
 }
+
 .ui-button--overlay,
 .ui-button--overlay:hover:not(:disabled) {
   background: var(--overlay);
@@ -581,8 +587,9 @@
   overflow-x: auto;
 }
 .ui-tabs [role="tab"][aria-selected="true"] {
-  background: var(--accent);
-  color: var(--surface);
+  background: transparent;
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 @keyframes ui-modal-enter {
   from {
