@@ -74,7 +74,11 @@ export function ProfilePage() {
         key={`${user.fullName}|${user.mobileNumber}|${user.timezone}`}
       />
       <AccessCard />
-      <SecurityCard lastLoginAt={user.lastLoginAt} format={format} />
+      <SecurityCard
+        email={user.email}
+        lastLoginAt={user.lastLoginAt}
+        format={format}
+      />
       <DevicesCard format={format} />
       <ActivityCard format={format} />
     </SettingsPage>
@@ -298,9 +302,11 @@ function AccessCard() {
 }
 
 function SecurityCard({
+  email,
   lastLoginAt,
   format,
 }: {
+  email: string;
   lastLoginAt?: string | null;
   format: Intl.DateTimeFormat;
 }) {
@@ -326,6 +332,7 @@ function SecurityCard({
         </SettingButton>
       </SettingRow>
       <ChangePasswordDialog
+        email={email}
         open={changing}
         onClose={() => setChanging(false)}
       />
