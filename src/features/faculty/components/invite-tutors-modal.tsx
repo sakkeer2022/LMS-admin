@@ -2,7 +2,12 @@
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { Link2, X } from "lucide-react";
 import { toast } from "sonner";
-import { Button, Input, Label, Modal, TextField, Typography } from "@/components/ui";
+import { TextField } from "@/components/forms/field";
+import { Button } from "@/components/shadcn/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
+import { Input } from "@/components/shadcn/input";
+import { Label } from "@/components/shadcn/label";
+import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api/contracts";
 import { describeApiError } from "@/lib/api/errors";
 import { useInviteTutors } from "../api/faculty";
@@ -34,7 +39,7 @@ async function copyText(text: string) {
  * becomes a chip. Invite emails every chip; Copy link creates one invitation without an
  * email and copies its secure link.
  */
-export function InviteTutorsModal({ tenant, open, onClose }: { tenant: string; open: boolean; onClose: () => void }) {
+export function InviteTutorsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const inputId = useId();
   const helpId = useId();
   const errorId = useId();
@@ -45,7 +50,7 @@ export function InviteTutorsModal({ tenant, open, onClose }: { tenant: string; o
   const [serverMessages, setServerMessages] = useState<string[]>([]);
   const [manualLink, setManualLink] = useState<string>();
   const [pendingAction, setPendingAction] = useState<"email" | "link">();
-  const invite = useInviteTutors(tenant);
+  const invite = useInviteTutors();
   const busy = invite.isPending;
 
   function reset() {
@@ -149,29 +154,28 @@ export function InviteTutorsModal({ tenant, open, onClose }: { tenant: string; o
   const describedBy = [helpId, error || serverMessages.length ? errorId : undefined].filter(Boolean).join(" ");
 
   return (
-    <Modal
-      open={open}
-      onClose={close}
-      title="Invite tutors"
-      className="invite-modal"
-      closeContent={<X aria-hidden="true" size={18} />}
-      closeDisabled={busy}
-      dismissOnBackdrop={!busy}
-    >
-      <div className="invite-modal-body">
+    <Dialog open={open} onOpenChange={(next) => !next && close()}>
+      <DialogContent
+        className="sm:max-w-lg"
+        showCloseButton={!busy}
+        onInteractOutside={(event) => busy && event.preventDefault()}
+        onEscapeKeyDown={(event) => busy && event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>Invite tutors</DialogTitle>
+          <DialogDescription className="sr-only">Invite tutors by email or copy a single invitation link.</DialogDescription>
+        </DialogHeader>
         {manualLink ? (
-          <>
-            <TextField
-              label="Invitation link"
-              readOnly
-              value={manualLink}
-              onFocus={(event) => event.currentTarget.select()}
-              description="Your browser blocked copying. Select the link and copy it, then share it with the tutor. It is shown only once."
-            />
-          </>
+          <TextField
+            label="Invitation link"
+            readOnly
+            value={manualLink}
+            onFocus={(event) => event.currentTarget.select()}
+            hint="Your browser blocked copying. Select the link and copy it, then share it with the tutor. It is shown only once."
+          />
         ) : (
-          <>
-            <div className="ui-field">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor={inputId}>Email address</Label>
               <Input
                 ref={input}
@@ -201,39 +205,39 @@ export function InviteTutorsModal({ tenant, open, onClose }: { tenant: string; o
                 }}
               />
               {(error || serverMessages.length > 0) && (
-                <div id={errorId} className="invite-errors" role="alert">
-                  {error && (
-                    <Typography variant="caption" component="p" tone="danger">
-                      {error}
-                    </Typography>
-                  )}
+                <div id={errorId} className="flex flex-col gap-0.5" role="alert">
+                  {error && <p className="text-xs text-error-foreground">{error}</p>}
                   {serverMessages.map((message) => (
-                    <Typography key={message} variant="caption" component="p" tone="danger">
+                    <p key={message} className="text-xs text-error-foreground">
                       {message}
-                    </Typography>
+                    </p>
                   ))}
                 </div>
               )}
             </div>
 
             {emails.length > 0 && (
-              <div className="invite-chips-block">
-                <Typography variant="caption" component="p" className="invite-chips-label">
-                  Entered emails
-                </Typography>
-                <ul className="invite-chips" aria-label={`Entered emails, ${emails.length} of ${MAX_INVITES_PER_REQUEST}`}>
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold">Entered emails</p>
+                <ul className="flex flex-wrap gap-2" aria-label={`Entered emails, ${emails.length} of ${MAX_INVITES_PER_REQUEST}`}>
                   {emails.map((email) => (
-                    <li key={email} className={flagged.has(email) ? "invite-chip invite-chip--error" : "invite-chip"}>
+                    <li
+                      key={email}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-pill border bg-sunken py-0.5 pr-1 pl-3 text-xs",
+                        flagged.has(email) && "border-destructive bg-error-subtle text-error-foreground",
+                      )}
+                    >
                       <span>{email}</span>
                       <Button
                         variant="ghost"
-                        size="sm"
-                        className="invite-chip-remove"
+                        size="icon-xs"
+                        className="rounded-pill"
                         aria-label={`Remove ${email}`}
                         disabled={busy}
                         onClick={() => remove(email)}
                       >
-                        <X aria-hidden="true" size={12} />
+                        <X aria-hidden="true" />
                       </Button>
                     </li>
                   ))}
@@ -241,46 +245,40 @@ export function InviteTutorsModal({ tenant, open, onClose }: { tenant: string; o
               </div>
             )}
 
-            <Typography id={helpId} variant="caption" component="p" tone="muted" className="invite-help">
+            <p id={helpId} className="text-xs text-muted-foreground">
               You can invite multiple tutors at once. They will receive an email with a secure link to complete their
               profile.
-            </Typography>
-          </>
+            </p>
+          </div>
         )}
-      </div>
 
-      <div className="invite-modal-footer">
-        {manualLink ? (
-          <Button variant="primary" onClick={close}>
-            Done
-          </Button>
-        ) : (
-          <>
-            <Button
-              onClick={() => void submit("link")}
-              // Keep focus in the input: a blur would add the typed address as a chip and move this button before the click lands
-              onMouseDown={(event) => event.preventDefault()}
-              disabled={busy && pendingAction !== "link"}
-              pending={pendingAction === "link"}
-              pendingLabel="Creating link…"
-            >
-              <Link2 aria-hidden="true" size={14} />
-              Copy link
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => void submit("email")}
-              // Keep focus in the input: a blur would add the typed address as a chip and move this button before the click lands
-              onMouseDown={(event) => event.preventDefault()}
-              disabled={busy && pendingAction !== "email"}
-              pending={pendingAction === "email"}
-              pendingLabel="Inviting…"
-            >
-              Invite
-            </Button>
-          </>
-        )}
-      </div>
-    </Modal>
+        <DialogFooter>
+          {manualLink ? (
+            <Button onClick={close}>Done</Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => void submit("link")}
+                // Keep focus in the input: a blur would add the typed address as a chip and move this button before the click lands
+                onMouseDown={(event) => event.preventDefault()}
+                disabled={busy}
+              >
+                <Link2 aria-hidden="true" />
+                {pendingAction === "link" ? "Creating link…" : "Copy link"}
+              </Button>
+              <Button
+                onClick={() => void submit("email")}
+                // Keep focus in the input: a blur would add the typed address as a chip and move this button before the click lands
+                onMouseDown={(event) => event.preventDefault()}
+                disabled={busy}
+              >
+                {pendingAction === "email" ? "Inviting…" : "Invite"}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

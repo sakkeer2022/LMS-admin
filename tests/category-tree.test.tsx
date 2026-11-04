@@ -9,7 +9,7 @@ import {
   addChildBlockedReason, applyMove, applyRelocation, applyReorder, breadcrumb, buildTree, codeFromName, keyboardPlacement, placementError,
   projectDrop, relocation, rowCount, rowCountLabel, searchMatches, visibleRows,
 } from '../src/lib/api/category-tree-model';
-import { Switch, VirtualTree, VIRTUALIZE_AFTER } from '../src/components/ui';
+import { Switch } from '../src/components/shadcn/switch';
 import { CategoryTreeList } from '../src/features/category-tree/components/category-tree-list';
 import { PermissionProvider } from '../src/components/security/permission-provider';
 import { CategoryDetailView } from '../src/features/category-tree/components/category-detail-panel';
@@ -176,30 +176,10 @@ describe('category tree list', () => {
 
 describe('Switch', () => {
   it('is a labelled switch reporting its state', () => {
-    const html = renderToStaticMarkup(<Switch checked label="Deactivate School" onCheckedChange={() => undefined} />);
+    const html = renderToStaticMarkup(<Switch checked aria-label="Deactivate School" onCheckedChange={() => undefined} />);
     expect(html).toContain('role="switch"');
     expect(html).toContain('aria-checked="true"');
     expect(html).toContain('aria-label="Deactivate School"');
-  });
-});
-
-describe('VirtualTree', () => {
-  const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ node: i, id: `r${i}`, level: 1, index: i, siblings: n, hasChildren: false, parentId: null }));
-  const render = (n: number) => renderToStaticMarkup(<VirtualTree label="Big tree" rows={rows(n)} expanded={new Set()} onToggle={() => undefined}
-    onSelect={() => undefined} renderLabel={(r) => `Row ${r.node}`} />);
-
-  it('renders every row of a small tree with tree semantics', () => {
-    const html = render(10);
-    expect(html.match(/role="treeitem"/g)).toHaveLength(10);
-    expect(html).toContain('aria-setsize="10"');
-    expect(html).toContain('aria-posinset="10"');
-  });
-
-  it('renders only the visible window of a large tree', () => {
-    const html = render(VIRTUALIZE_AFTER * 10);
-    const items = html.match(/role="treeitem"/g)?.length ?? 0;
-    expect(items).toBeGreaterThan(0);
-    expect(items).toBeLessThan(100);
   });
 });
 
@@ -207,11 +187,11 @@ describe('category detail panel', () => {
   const actions = { onAddChild: () => undefined, onEdit: () => undefined, onDelete: () => undefined, onToggleActive: () => undefined, onError: () => undefined };
 
   it('matches the design: breadcrumb, status, count card, Active switch, and Add sub-category disabled on a bookable leaf', () => {
-    const html = wrap(<CategoryDetailView tenant="t1" detail={categoryDetailSchema.parse(liveDetail)} node={k12} canManage pending={false} {...actions} />);
+    const html = wrap(<CategoryDetailView detail={categoryDetailSchema.parse(liveDetail)} node={k12} canManage pending={false} {...actions} />);
     expect(html).toContain('Academic › School › K-12');
-    expect(html).toMatch(/role="switch" aria-checked="true" aria-label="Deactivate K-12"/);
+    expect(html).toMatch(/role="switch" aria-checked="true"[^>]*aria-label="Deactivate K-12"/);
     expect(html).toContain('Status');
-    expect(html).toMatch(/ui-typography--h1 tabular-nums">6<\/p><span[^>]*>Curricula/);
+    expect(html).toMatch(/tabular-nums">6<\/p><span[^>]*>Curricula/);
     expect(html).toContain('Class 1');
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*><svg[^>]*lucide-plus[\s\S]*?Add sub-category/);
     expect(html).not.toContain('>Move<');
@@ -220,7 +200,7 @@ describe('category detail panel', () => {
   });
 
   it('hides every action without catalogue.manage', () => {
-    const html = wrap(<CategoryDetailView tenant="t1" detail={categoryDetailSchema.parse(liveDetail)} node={k12} canManage={false} pending={false} {...actions} />, ['catalogue.read']);
+    const html = wrap(<CategoryDetailView detail={categoryDetailSchema.parse(liveDetail)} node={k12} canManage={false} pending={false} {...actions} />, ['catalogue.read']);
     expect(html).not.toContain('Delete');
     expect(html).not.toContain('Add sub-category');
   });
@@ -228,17 +208,17 @@ describe('category detail panel', () => {
 
 describe('category tree page', () => {
   it('shows a loading state, and Reorder and Add category only to managers', () => {
-    const html = wrap(<CategoryTreePage tenant="t1" />);
+    const html = wrap(<CategoryTreePage />);
     expect(html).toContain('Category manager');
-    expect(html).toContain('>Reorder</button>');
+    expect(html).toMatch(/>Reorder<\/button>/);
     expect(html).toContain('>Add category</button>');
     expect(html).toContain('opacity-0');
-    const reader = wrap(<CategoryTreePage tenant="t1" />, ['catalogue.read']);
+    const reader = wrap(<CategoryTreePage />, ['catalogue.read']);
     expect(reader).not.toContain('Add category');
     expect(reader).not.toContain('>Reorder<');
   });
 
   it('refuses without catalogue.read', () => {
-    expect(wrap(<CategoryTreePage tenant="t1" />, [])).toContain('permission to view the catalogue');
+    expect(wrap(<CategoryTreePage />, [])).toContain('permission to view the catalogue');
   });
 });

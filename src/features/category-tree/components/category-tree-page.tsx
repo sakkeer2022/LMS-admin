@@ -1,13 +1,18 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Search } from 'lucide-react';
-import { Button, Card, Input, Tabs, Typography, cx, type TabItem } from '@/components/ui';
-import { PanelMessage, PanelSkeleton } from '@/components/ui/dashboard-ui';
+import { PageHeader } from '@/components/layout/page-header';
+import { PanelMessage } from '@/components/layout/panel-message';
+import { Button } from '@/components/shadcn/button';
+import { Card } from '@/components/shadcn/card';
+import { Input } from '@/components/shadcn/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/shadcn/tabs';
+import { cn as cx } from '@/lib/utils';
 import { usePermission } from '@/components/security/permission-provider';
 import { describeApiError } from '@/lib/api/errors';
 import { useCategoryTree, useRelocateCategory, useUpdateCategory, type CategoryNode } from '@/lib/api/category-tree';
 import { buildTree, expandableIds, relocation, searchMatches, visibleRows, type Placement } from '@/lib/api/category-tree-model';
-import { CategoryDetailPanel } from './category-detail-panel';
+import { CategoryDetailPanel, Rows } from './category-detail-panel';
 import { CategoryFormDialog, DeleteCategoryDialog, type FormState } from './category-dialogs';
 import { CategoryTreeList, type TreeRow } from './category-tree-list';
 
@@ -27,12 +32,12 @@ const timeFormat = new Intl.DateTimeFormat('en-IN', { timeStyle: 'short', timeZo
  * tree draggable: drop to reorder siblings, drag right or left to change the parent.
  * Writes are optimistic and roll back when the server refuses them.
  */
-export function CategoryTreePage({ tenant, extraTabs = [] }: { tenant: string; extraTabs?: TabItem[] }) {
+export function CategoryTreePage() {
   const canRead = usePermission('catalogue.read');
   const canManage = usePermission('catalogue.manage');
-  const tree = useCategoryTree(tenant, canRead);
-  const relocate = useRelocateCategory(tenant);
-  const update = useUpdateCategory(tenant);
+  const tree = useCategoryTree(canRead);
+  const relocate = useRelocateCategory();
+  const update = useUpdateCategory();
   const [search, setSearch] = useState('');
   const q = useDebounced(search, 200);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -109,41 +114,41 @@ export function CategoryTreePage({ tenant, extraTabs = [] }: { tenant: string; e
     ? `Category → sub-category → bookable category · ${stats.categories.toLocaleString('en-IN')} categories · ${stats.bookableLeaves.toLocaleString('en-IN')} bookable · ${stats.curricula.toLocaleString('en-IN')} curricula`
     : 'Category → sub-category → bookable category';
 
-  const treeCard = <Card style={{ padding: 0, overflow: 'hidden' }} className={cx('relative flex min-w-0 flex-col transition-shadow duration-200',
-    reorder && 'z-50 shadow-[0_0_0_2px_var(--accent),0_24px_48px_rgb(15_23_42/0.25)]')}>
-    <div className="flex flex-wrap items-start justify-between gap-3 px-5 pb-3 pt-5 md:flex-nowrap">
+  const treeCard = <Card className={cx('relative flex min-w-0 flex-col gap-0 overflow-hidden py-0 transition-shadow duration-200',
+    reorder && 'z-50 shadow-[0_0_0_2px_var(--primary),0_24px_48px_rgb(15_23_42/0.25)]')}>
+    <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5 pb-3 md:flex-nowrap">
       <div className="flex min-w-0 basis-full flex-col gap-0.5 md:basis-auto md:flex-1">
-        <Typography variant="h3" component="h2">Category manager</Typography>
-        <Typography variant="caption" tone="muted">
+        <h2 className="text-lg font-semibold">Category manager</h2>
+        <p className="text-xs text-muted-foreground">
           {reorder ? 'Drag a row to reorder it. Drag right to nest it, left to move it out.' : 'Organize categories, sub-categories, and nested levels'}
-        </Typography>
+        </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {!reorder && <div className="relative">
-          <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+          <Search size={14} aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
           <Input type="search" aria-label="Search categories" placeholder="Search" value={search} onChange={(e) => setSearch(e.target.value)}
-            style={{ paddingInlineStart: 32, minHeight: 32, height: 32, width: 150 }} />
+            className="h-8 w-40 pl-8" />
         </div>}
-        <Button size="sm" onClick={() => setExpanded(allOpen ? new Set() : new Set(allExpandable))} disabled={!allExpandable.length}>
+        <Button size="sm" variant="outline" onClick={() => setExpanded(allOpen ? new Set() : new Set(allExpandable))} disabled={!allExpandable.length}>
           {allOpen ? 'Collapse all' : 'Expand all'}
         </Button>
-        {reorder && <Button size="sm" variant="primary" onClick={() => setReorder(false)} className="inline-flex items-center gap-1">
-          <Check size={14} aria-hidden="true" /> Done
+        {reorder && <Button size="sm" onClick={() => setReorder(false)}>
+          <Check aria-hidden="true" /> Done
         </Button>}
       </div>
     </div>
-    {reorder && <Typography id="category-tree-reorder-help" variant="caption" tone="muted" component="p" className="px-5 pb-2">
+    {reorder && <p id="category-tree-reorder-help" className="px-5 pb-2 text-xs text-muted-foreground">
       Keyboard: focus a row, then Alt+Up or Alt+Down to reorder, Alt+Right to nest under the row above, Alt+Left to move out. Escape ends reordering.
-    </Typography>}
+    </p>}
 
-    <div className="border-t border-[var(--border)]">
-      {tree.isPending ? <div className="p-5"><PanelSkeleton rows={8} /></div>
+    <div className="border-t">
+      {tree.isPending ? <div className="p-5"><Rows count={8} /></div>
         : tree.isError ? <div className="p-5"><PanelMessage onRetry={() => void tree.refetch()}>The categories could not be loaded. {describeApiError(tree.error, 'view the catalogue').message}</PanelMessage></div>
         : nodes.length === 0 ? <div className="flex flex-col items-start gap-3 p-5">
-            <Typography>There are no categories yet. Start with a root such as Academic.</Typography>
-            {canManage && <Button variant="primary" onClick={() => setDialog({ kind: 'form', state: { mode: 'create', parent: null } })}>Add category</Button>}
+            <p className="text-sm">There are no categories yet. Start with a root such as Academic.</p>
+            {canManage && <Button onClick={() => setDialog({ kind: 'form', state: { mode: 'create', parent: null } })}>Add category</Button>}
           </div>
-        : rows.length === 0 ? <Typography tone="muted" className="p-5">Nothing matches “{q}”.</Typography>
+        : rows.length === 0 ? <p className="p-5 text-sm text-muted-foreground">Nothing matches “{q}”.</p>
         : <CategoryTreeList rows={rows} nodes={nodes} expanded={open} onToggle={toggle} selectedId={selectedId}
             onSelect={(node) => setSelectedId(node.id)} reorder={reorder} onRelocate={onRelocate}
             onInvalidDrop={(text) => setNotice({ tone: 'danger', text })} canManage={canManage} pendingIds={pendingIds}
@@ -153,7 +158,7 @@ export function CategoryTreePage({ tenant, extraTabs = [] }: { tenant: string; e
     </div>
 
     {tree.data && <div className="flex items-center gap-2 px-5 py-2">
-      <Typography variant="caption" tone="muted">Loaded at {timeFormat.format(new Date(tree.data.generatedAt))}{tree.isFetching ? ' · refreshing…' : ''}</Typography>
+      <span className="text-xs text-muted-foreground">Loaded at {timeFormat.format(new Date(tree.data.generatedAt))}{tree.isFetching ? ' · refreshing…' : ''}</span>
       <Button size="sm" variant="ghost" onClick={refresh} disabled={tree.isFetching}>Refresh</Button>
     </div>}
   </Card>;
@@ -163,49 +168,48 @@ export function CategoryTreePage({ tenant, extraTabs = [] }: { tenant: string; e
     <div aria-hidden="true" className={cx('fixed inset-0 z-40 bg-[rgb(15_23_42/0.38)] transition-opacity duration-200',
       reorder ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0')} />
 
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="flex min-w-0 flex-col gap-1">
-        <Typography variant="h1">Categories &amp; content</Typography>
-        <Typography variant="body2" tone="muted">{subtitle}</Typography>
-      </div>
-      {canManage && <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={() => { setReorder((r) => !r); setDialog(null); }} aria-pressed={reorder}
-          disabled={!nodes.length} className={cx('relative', reorder && 'z-50')}
-          style={reorder ? { background: 'var(--surface)', borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}>
-          {reorder ? 'Done reordering' : 'Reorder'}
-        </Button>
-        <Button variant="primary" inert={reorder} title="Add a top-level category"
-          onClick={() => setDialog({ kind: 'form', state: { mode: 'create', parent: null } })}>Add category</Button>
-      </div>}
-    </div>
+    <PageHeader title="Categories & content" description={subtitle} actions={canManage && <>
+      <Button variant="outline" onClick={() => { setReorder((r) => !r); setDialog(null); }} aria-pressed={reorder}
+        disabled={!nodes.length} className={cx('relative', reorder && 'z-50 border-primary text-primary')}>
+        {reorder ? 'Done reordering' : 'Reorder'}
+      </Button>
+      <Button inert={reorder} title="Add a top-level category"
+        onClick={() => setDialog({ kind: 'form', state: { mode: 'create', parent: null } })}>Add category</Button>
+    </>} />
 
-    {notice && <Card className={cx('relative flex flex-wrap items-center gap-3 p-3', reorder && 'z-50')} role="alert">
-      <Typography variant="body2" tone={notice.tone === 'danger' ? 'danger' : 'default'}>{notice.text}</Typography>
-      {notice.stale && <Button size="sm" onClick={refresh}>Reload</Button>}
+    {notice && <Card className={cx('relative flex-row flex-wrap items-center gap-3 p-3', reorder && 'z-50')} role="alert">
+      <p className={cx('text-sm', notice.tone === 'danger' && 'text-error-foreground')}>{notice.text}</p>
+      {notice.stale && <Button size="sm" variant="outline" onClick={refresh}>Reload</Button>}
       <Button size="sm" variant="ghost" onClick={() => setNotice(undefined)}>Dismiss</Button>
     </Card>}
 
-    <Tabs label="Categories and content" items={[{ id: 'categories', label: 'Categories', content:
-      <div className="grid items-start gap-4 pt-4 lg:grid-cols-[minmax(0,1.85fr)_minmax(300px,1fr)]">
-        {treeCard}
-        <div className="min-w-0" inert={reorder}>
-          <CategoryDetailPanel tenant={tenant} node={selected} canManage={canManage} pending={selected ? pendingIds.has(selected.id) : false}
-            onAddChild={(parent) => setDialog({ kind: 'form', state: { mode: 'create', parent } })}
-            onEdit={(node) => setDialog({ kind: 'form', state: { mode: 'edit', node } })}
-            onDelete={(node) => setDialog({ kind: 'delete', node })}
-            onToggleActive={onToggleActive}
-            onError={report} />
+    <Tabs defaultValue="categories">
+      <TabsList aria-label="Categories and content">
+        <TabsTrigger value="categories">Categories</TabsTrigger>
+      </TabsList>
+      <TabsContent value="categories">
+        <div className="grid items-start gap-4 pt-4 lg:grid-cols-[minmax(0,1.85fr)_minmax(300px,1fr)]">
+          {treeCard}
+          <div className="min-w-0" inert={reorder}>
+            <CategoryDetailPanel node={selected} canManage={canManage} pending={selected ? pendingIds.has(selected.id) : false}
+              onAddChild={(parent) => setDialog({ kind: 'form', state: { mode: 'create', parent } })}
+              onEdit={(node) => setDialog({ kind: 'form', state: { mode: 'edit', node } })}
+              onDelete={(node) => setDialog({ kind: 'delete', node })}
+              onToggleActive={onToggleActive}
+              onError={report} />
+          </div>
         </div>
-      </div> }, ...extraTabs]} />
+      </TabsContent>
+    </Tabs>
 
-    {dialog?.kind === 'form' && <CategoryFormDialog tenant={tenant} state={dialog.state} nodes={nodes} onClose={() => setDialog(null)}
+    {dialog?.kind === 'form' && <CategoryFormDialog state={dialog.state} nodes={nodes} onClose={() => setDialog(null)}
       onSaved={(id) => {
         const parent = dialog.state.mode === 'create' ? dialog.state.parent : null;
         setDialog(null);
         setSelectedId(id);
         if (parent) toggle(parent.id, true);
       }} />}
-    {dialog?.kind === 'delete' && <DeleteCategoryDialog tenant={tenant} node={dialog.node} onClose={() => setDialog(null)}
+    {dialog?.kind === 'delete' && <DeleteCategoryDialog node={dialog.node} onClose={() => setDialog(null)}
       onDeleted={() => { setDialog(null); setSelectedId(undefined); }} />}
   </div>;
 }

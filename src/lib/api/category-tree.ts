@@ -68,20 +68,20 @@ const base = '/admin/category-tree';
 const at = (id: string) => `${base}/${encodeURIComponent(id)}`;
 
 export const categoryTreeKeys = {
-  all: (tenant: string) => ['category-tree', tenant] as const,
-  tree: (tenant: string) => ['category-tree', tenant, 'tree'] as const,
-  detail: (tenant: string, id: string) => ['category-tree', tenant, 'detail', id] as const,
-  offerings: (tenant: string, id: string) => ['category-tree', tenant, 'offerings', id] as const,
-  lookups: (tenant: string, kind: 'levels' | 'boards' | 'subjects') => ['category-tree', tenant, 'lookups', kind] as const,
+  all: () => ['category-tree'] as const,
+  tree: () => ['category-tree', 'tree'] as const,
+  detail: (id: string) => ['category-tree', 'detail', id] as const,
+  offerings: (id: string) => ['category-tree', 'offerings', id] as const,
+  lookups: (kind: 'levels' | 'boards' | 'subjects') => ['category-tree', 'lookups', kind] as const,
 };
 
 /**
  * The whole tree, loaded once per admin session: it never goes stale on its own and
  * is refreshed only after a write (or the Refresh button). The server caches it too.
  */
-export function useCategoryTree(tenant: string, enabled = true) {
+export function useCategoryTree(enabled = true) {
   return useQuery({
-    queryKey: categoryTreeKeys.tree(tenant),
+    queryKey: categoryTreeKeys.tree(),
     enabled,
     staleTime: Infinity,
     gcTime: 60 * 60_000,
@@ -90,27 +90,27 @@ export function useCategoryTree(tenant: string, enabled = true) {
   });
 }
 
-export function useCategoryDetail(tenant: string, id: string | undefined) {
+export function useCategoryDetail(id: string | undefined) {
   return useQuery({
-    queryKey: categoryTreeKeys.detail(tenant, id ?? ''),
+    queryKey: categoryTreeKeys.detail(id ?? ''),
     enabled: Boolean(id),
     queryFn: ({ signal }) => getData(categoryDetailSchema, at(id!), signal),
   });
 }
 
-export function useOfferings(tenant: string, id: string | undefined) {
+export function useOfferings(id: string | undefined) {
   return useQuery({
-    queryKey: categoryTreeKeys.offerings(tenant, id ?? ''),
+    queryKey: categoryTreeKeys.offerings(id ?? ''),
     enabled: Boolean(id),
     queryFn: ({ signal }) => getData(z.array(offeringSchema), `${at(id!)}/offerings`, signal),
   });
 }
 
 /** Lookup lists for the forms (board, level and subject are managed on their own screens). */
-export function useLookup(tenant: string, kind: 'levels' | 'boards' | 'subjects', enabled = true) {
+export function useLookup(kind: 'levels' | 'boards' | 'subjects', enabled = true) {
   const path = kind === 'levels' ? '/admin/catalogue/levels' : `/admin/catalogue/${kind}`;
   return useQuery({
-    queryKey: categoryTreeKeys.lookups(tenant, kind),
+    queryKey: categoryTreeKeys.lookups(kind),
     enabled,
     staleTime: 10 * 60_000,
     queryFn: ({ signal }) => getData(z.array(lookup), `${path}?${queryString({ limit: '100' })}`, signal),
@@ -121,13 +121,11 @@ export function useLookup(tenant: string, kind: 'levels' | 'boards' | 'subjects'
  * Every write: optional optimistic edit of the cached tree, rollback on failure, and a
  * refetch of the tree and the affected detail once settled (server is authoritative).
  */
-function useTreeMutation<V, R>(
-  tenant: string,
-  fn: (input: V) => Promise<R>,
+function useTreeMutation<V, R>(fn: (input: V) => Promise<R>,
   optimistic?: (nodes: CategoryNode[], input: V) => CategoryNode[]
 ) {
   const client = useQueryClient();
-  const key = categoryTreeKeys.tree(tenant);
+  const key = categoryTreeKeys.tree();
   return useMutation({
     mutationFn: fn,
     meta: { inlineErrors: true },
@@ -141,30 +139,26 @@ function useTreeMutation<V, R>(
     onError: (_error, _input, context) => {
       if (context?.previous) client.setQueryData(key, context.previous);
     },
-    onSettled: () => client.invalidateQueries({ queryKey: categoryTreeKeys.all(tenant) }),
+    onSettled: () => client.invalidateQueries({ queryKey: categoryTreeKeys.all() }),
   });
 }
 
-export const useCreateCategory = (tenant: string) =>
-  useTreeMutation(tenant, async ({ parentId, code, name }: { parentId: string | null; code: string; name: string }) =>
+export const useCreateCategory = () =>
+  useTreeMutation(async ({ parentId, code, name }: { parentId: string | null; code: string; name: string }) =>
     categoryDetailSchema.parse((await api<unknown>(parentId ? `${at(parentId)}/children` : `${base}/roots`, json('POST', { code, name }))).data));
 
-export const useUpdateCategory = (tenant: string) =>
-  useTreeMutation(
-    tenant,
-    async ({ id, ...body }: { id: string; version: number; name?: string; code?: string; isActive?: boolean }) =>
+export const useUpdateCategory = () =>
+  useTreeMutation(async ({ id, ...body }: { id: string; version: number; name?: string; code?: string; isActive?: boolean }) =>
       categoryDetailSchema.parse((await api<unknown>(at(id), json('PATCH', body))).data),
     (nodes, { id, name, isActive }) => applyRename(nodes, id, { ...(name !== undefined && { name }), ...(isActive !== undefined && { isActive }) })
   );
 
-export const useSaveLeafSettings = (tenant: string) =>
-  useTreeMutation(tenant, async ({ id, ...body }: { id: string; version: number; isBookable: boolean; requiresBoard: boolean; requiresLevel: boolean; levelIds: string[] }) =>
+export const useSaveLeafSettings = () =>
+  useTreeMutation(async ({ id, ...body }: { id: string; version: number; isBookable: boolean; requiresBoard: boolean; requiresLevel: boolean; levelIds: string[] }) =>
     categoryDetailSchema.parse((await api<unknown>(`${at(id)}/leaf-settings`, json('PUT', body))).data));
 
-export const useReorderCategories = (tenant: string) =>
-  useTreeMutation(
-    tenant,
-    async (body: { parentId: string | null; orderedIds: string[] }) => (await api<unknown>(`${base}/reorder`, json('PUT', body))).data,
+export const useReorderCategories = () =>
+  useTreeMutation(async (body: { parentId: string | null; orderedIds: string[] }) => (await api<unknown>(`${base}/reorder`, json('PUT', body))).data,
     (nodes, { orderedIds }) => applyReorder(nodes, orderedIds)
   );
 
@@ -175,10 +169,8 @@ export type Relocation = ReturnType<typeof relocation>;
  * another parent (one transaction on the server). The caller works out `change` from the
  * tree it shows (relocation()); the tree updates at once and rolls back if the server refuses.
  */
-export const useRelocateCategory = (tenant: string) =>
-  useTreeMutation(
-    tenant,
-    async ({ node, change }: { node: CategoryNode; to: Placement; change: Relocation }) => {
+export const useRelocateCategory = () =>
+  useTreeMutation(async ({ node, change }: { node: CategoryNode; to: Placement; change: Relocation }) => {
       if (change.kind === 'reorder') await api<unknown>(`${base}/reorder`, json('PUT', { parentId: change.parentId, orderedIds: change.orderedIds }));
       if (change.kind === 'move') await api<unknown>(`${at(node.id)}/move`, json('PUT', { version: node.version, parentId: change.parentId, index: change.index }));
       return change.kind;
@@ -186,15 +178,15 @@ export const useRelocateCategory = (tenant: string) =>
     (nodes, { node, to, change }) => (change.kind === 'none' ? nodes : applyRelocation(nodes, node.id, to))
   );
 
-export const useDeleteCategory = (tenant: string) =>
-  useTreeMutation(tenant, async ({ id, version }: { id: string; version: number }) => {
+export const useDeleteCategory = () =>
+  useTreeMutation(async ({ id, version }: { id: string; version: number }) => {
     await api<null>(`${at(id)}?${queryString({ version: String(version) })}`, { method: 'DELETE' });
   });
 
-export const useAddOffering = (tenant: string) =>
-  useTreeMutation(tenant, async ({ categoryId, ...body }: { categoryId: string; subjectId: string; boardId: string | null; levelId: string | null }) =>
+export const useAddOffering = () =>
+  useTreeMutation(async ({ categoryId, ...body }: { categoryId: string; subjectId: string; boardId: string | null; levelId: string | null }) =>
     offeringSchema.parse((await api<unknown>(`${at(categoryId)}/offerings`, json('POST', body))).data));
 
-export const useSetOfferingActive = (tenant: string) =>
-  useTreeMutation(tenant, async ({ curriculumId, isActive }: { curriculumId: string; isActive: boolean }) =>
+export const useSetOfferingActive = () =>
+  useTreeMutation(async ({ curriculumId, isActive }: { curriculumId: string; isActive: boolean }) =>
     offeringSchema.parse((await api<unknown>(`${base}/offerings/${encodeURIComponent(curriculumId)}`, json('PATCH', { isActive }))).data));
