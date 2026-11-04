@@ -27,3 +27,10 @@ npm run build
 ## UI
 
 The dashboard and faculty directory use the development adapter in `src/features/dashboard/adapter.ts`; see [UI_IMPLEMENTATION.md](UI_IMPLEMENTATION.md). The UI is shadcn/ui on Tailwind CSS v4: primitives are in `src/components/shadcn`, app-level pieces in `src/components/layout`, `src/components/data-table` and `src/components/settings`, and the Figma tokens in `src/app/globals.css`.
+
+## Legal documents and students (`/admin/legal`, `/admin/students`)
+
+- **Legal documents** (`policy.read`; upload needs `policy.create`, rolling back needs `policy.update`): a card per country (from `GET /regions/countries`) with the four policy types, the current version, a history with "Make current", a warning while a country lacks any of the four (`GET /admin/policies/coverage`), and an upload dialog (PDF, version, title, effective date; `POST /admin/policies`). A new version is live for students as soon as it is saved.
+- **Students** (`student.read`): list with search, country, age group and consent filters, a notice with the number of minors without a signed consent, and a detail panel (learning profile, guardian contact, consent record). "Download signed consent" asks for the password (`POST /auth/reauthenticate`) and is audited.
+- Uploads and consent downloads need a fresh password confirmation; `ReauthProvider` shows the password dialog and retries.
+- Neither screen has a Figma frame yet; they are built in the existing settings and table style (amentorz-backend `docs/PENDING_DECISIONS.md`, P12).

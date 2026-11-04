@@ -1,0 +1,232 @@
+"use client";
+import { Download, FileCheck2 } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { toast } from "sonner";
+import { Badge } from "@/components/shadcn/badge";
+import { Button } from "@/components/shadcn/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/shadcn/sheet";
+import { Skeleton } from "@/components/shadcn/skeleton";
+import { usePermission } from "@/components/security/permission-provider";
+import { ApiError } from "@/lib/api/contracts";
+import { useDownloadConsent, useStudent } from "./api";
+import { ConsentBadge, formatDate } from "./students-page";
+import { RELATIONSHIP_LABELS } from "./types";
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section
+      aria-label={title}
+      className="flex flex-col gap-3 border-t border-border-subtle pt-5"
+    >
+      <h3 className="text-sm font-semibold">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[9rem_1fr] gap-3 text-sm">
+      <dt className="text-text-secondary">{label}</dt>
+      <dd className="min-w-0 break-words">{children}</dd>
+    </div>
+  );
+}
+
+/** One student: details, learning profile, guardian contact and the signed consent with its download. */
+export function StudentSheet({
+  studentId,
+  onClose,
+}: {
+  studentId: string | null;
+  onClose: () => void;
+}) {
+  const query = useStudent(studentId);
+  const download = useDownloadConsent();
+  const [downloading, setDownloading] = useState(false);
+  const canRead = usePermission("student.read");
+  const student = query.data;
+
+  async function fetchConsent(): Promise<void> {
+    if (!student) return;
+    setDownloading(true);
+    try {
+      await download(student.id, student.fullName);
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError
+          ? error.message
+          : "The consent could not be downloaded.",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <Sheet
+      open={studentId !== null}
+      onOpenChange={(open) => !open && onClose()}
+    >
+      <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-lg">
+        <SheetHeader className="pb-4">
+          <SheetTitle>{student?.fullName ?? "Student"}</SheetTitle>
+          <SheetDescription>
+            {student?.email ?? "Loading the student…"}
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex flex-col gap-5 px-4 pb-6">
+          {query.isError ? (
+            <p role="alert" className="text-sm text-error-foreground">
+              The student could not be loaded.
+            </p>
+          ) : !student ? (
+            <div aria-busy="true" className="flex flex-col gap-3">
+              <Skeleton className="h-5 w-1/2" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : (
+            <>
+              <dl className="flex flex-col gap-2">
+                <Fact label="Age">
+                  {student.age}
+                  {student.isMinor && (
+                    <Badge variant="info" className="ml-2">
+                      Minor
+                    </Badge>
+                  )}
+                </Fact>
+                <Fact label="Date of birth">
+                  {formatDate(student.dateOfBirth)}
+                </Fact>
+                <Fact label="Country">{student.country}</Fact>
+                <Fact label="Mobile">{student.mobileNumber ?? "—"}</Fact>
+                <Fact label="Account">
+                  {student.isActive ? (
+                    <Badge variant="success">Active</Badge>
+                  ) : (
+                    <Badge variant="secondary">Disabled</Badge>
+                  )}
+                </Fact>
+                <Fact label="Registered">
+                  {formatDate(student.registeredAt)}
+                </Fact>
+              </dl>
+
+              <Section title="Learning profile">
+                <dl className="flex flex-col gap-2">
+                  <Fact label="Category">
+                    {student.learningProfile.category}
+                  </Fact>
+                  {student.learningProfile.board && (
+                    <Fact label="Board">{student.learningProfile.board}</Fact>
+                  )}
+                  <Fact label="Level">{student.learningProfile.level}</Fact>
+                  <Fact label="Teaching language">
+                    {student.learningProfile.teachingLanguage}
+                  </Fact>
+                  <Fact label="Subjects">
+                    {student.learningProfile.subjects.length
+                      ? student.learningProfile.subjects.join(", ")
+                      : "—"}
+                  </Fact>
+                </dl>
+              </Section>
+
+              <Section title="Parent or guardian">
+                {student.guardian ? (
+                  <dl className="flex flex-col gap-2">
+                    <Fact label="Name">{student.guardian.fullName}</Fact>
+                    <Fact label="Relationship">
+                      {RELATIONSHIP_LABELS[student.guardian.relationship] ??
+                        student.guardian.relationship}
+                    </Fact>
+                    <Fact label="Mobile">{student.guardian.mobileNumber}</Fact>
+                    <Fact label="Email">{student.guardian.email}</Fact>
+                    <Fact label="Reports and receipts">
+                      {student.guardian.receivesReportsAndReceipts
+                        ? "Also sent to the guardian"
+                        : "Student only"}
+                    </Fact>
+                  </dl>
+                ) : (
+                  <p className="text-sm text-text-secondary">
+                    {student.isMinor
+                      ? "No guardian contact is on record."
+                      : "Not required for this student."}
+                  </p>
+                )}
+              </Section>
+
+              <Section title="Guardian consent">
+                <div className="flex items-center gap-2">
+                  <ConsentBadge status={student.consentStatus} />
+                  {student.consentStatus === "missing" && (
+                    <span className="text-xs text-warning-foreground">
+                      This minor has no signed consent on record.
+                    </span>
+                  )}
+                </div>
+                {student.consent && (
+                  <>
+                    <dl className="flex flex-col gap-2">
+                      <Fact label="Document">
+                        {student.consent.policyTitle} v
+                        {student.consent.policyVersion} (
+                        {student.consent.country})
+                      </Fact>
+                      <Fact label="Signed">
+                        {formatDate(student.consent.signedAt)}
+                      </Fact>
+                      <Fact label="Signed by">
+                        {student.consent.guardianName ?? "—"}
+                        {student.consent.guardianRelationship
+                          ? ` (${RELATIONSHIP_LABELS[student.consent.guardianRelationship] ?? student.consent.guardianRelationship})`
+                          : ""}
+                      </Fact>
+                      <Fact label="File fingerprint">
+                        <code className="text-xs break-all">
+                          {student.consent.signedPdfSha256}
+                        </code>
+                      </Fact>
+                    </dl>
+                    {canRead && (
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          className="w-fit"
+                          disabled={downloading}
+                          aria-busy={downloading || undefined}
+                          onClick={() => void fetchConsent()}
+                        >
+                          {student.consent ? (
+                            <Download aria-hidden className="size-4" />
+                          ) : (
+                            <FileCheck2 aria-hidden className="size-4" />
+                          )}
+                          {downloading
+                            ? "Preparing…"
+                            : "Download signed consent"}
+                        </Button>
+                        <p className="text-xs text-text-secondary">
+                          Asks for your password, and the download is recorded
+                          in the audit log.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </Section>
+            </>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
