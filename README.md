@@ -26,4 +26,4 @@ npm run build
 
 ## UI
 
-The dashboard and faculty directory use the development adapter in `src/features/dashboard/adapter.ts`; see [UI_IMPLEMENTATION.md](UI_IMPLEMENTATION.md). Shared components are in `src/components/ui`; see its README.
+The dashboard and faculty directory use the development adapter in `src/features/dashboard/adapter.ts`; see [UI_IMPLEMENTATION.md](UI_IMPLEMENTATION.md). The UI is shadcn/ui on Tailwind CSS v4: primitives are in `src/components/shadcn`, app-level pieces in `src/components/layout`, `src/components/data-table` and `src/components/settings`, and the Figma tokens in `src/app/globals.css`.

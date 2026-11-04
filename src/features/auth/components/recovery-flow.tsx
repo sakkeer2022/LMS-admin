@@ -1,14 +1,16 @@
 "use client";
-import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  LoginField,
-  LoginForm,
-  LoginHeading,
-  LoginSecondaryButton,
-  LoginSubmit,
-} from "@/components/ui/login-controls";
+  AuthError,
+  AuthField,
+  AuthFormShell,
+  AuthHead,
+  AuthLinkButton,
+  AuthSecondaryButton,
+  AuthStack,
+  AuthSubmit,
+  AuthSuccess,
+} from "@/components/auth/auth-controls";
 import { api } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/contracts";
 import {
@@ -180,51 +182,33 @@ export function RecoveryFlow({ portal }: { portal: Portal }) {
 
   if (step === "done") {
     return (
-      <div className="login-form login-done">
-        <span className="login-success-mark">
-          <Image
-            src="/auth/icon-circle-check.svg"
-            alt=""
-            width={20}
-            height={20}
-          />
-        </span>
-        <div className="login-head">
-          <LoginHeading>Password updated</LoginHeading>
-          <p className="login-lead">
-            You are signed out on every other device. Use your new password next
-            time you log in.
-          </p>
-        </div>
-        <Link className="login-submit login-submit--link" href="/login">
-          Log in
-        </Link>
-      </div>
+      <AuthSuccess>
+        <AuthHead
+          title="Password updated"
+          lead="You are signed out on every other device. Use your new password next time you log in."
+        />
+        <AuthLinkButton href="/login">Log in</AuthLinkButton>
+      </AuthSuccess>
     );
   }
 
   const errorLine = error && Object.keys(fields).length === 0 && (
-    <p className="login-error" role="alert">
-      {error}
-    </p>
+    <AuthError>{error}</AuthError>
   );
 
   if (step === "email") {
     return (
-      <LoginForm
+      <AuthFormShell
         onSubmit={submitEmail}
         noValidate
         aria-label="Reset your password"
         pending={pending}
       >
-        <div className="login-head">
-          <LoginHeading>Reset your password</LoginHeading>
-          <p className="login-lead">
-            Enter the email on your Amentorz account. We will send a 6-digit
-            code that expires in 10 minutes.
-          </p>
-        </div>
-        <LoginField
+        <AuthHead
+          title="Reset your password"
+          lead={<>Enter the email on your Amentorz account. We will send a 6-digit             code that expires in 10 minutes.</>}
+        />
+        <AuthField
           name="email"
           label="Email"
           type="email"
@@ -236,34 +220,29 @@ export function RecoveryFlow({ portal }: { portal: Portal }) {
           aria-required
         />
         {errorLine}
-        <div className="login-stack">
-          <LoginSubmit pending={pending}>
+        <AuthStack>
+          <AuthSubmit pending={pending}>
             {pending ? "Sending…" : "Send reset code"}
-          </LoginSubmit>
-          <Link className="login-secondary" href="/login">
-            Back to log in
-          </Link>
-        </div>
-      </LoginForm>
+          </AuthSubmit>
+          <AuthLinkButton href="/login" variant="ghost">Back to log in</AuthLinkButton>
+        </AuthStack>
+      </AuthFormShell>
     );
   }
 
   if (step === "code") {
     return (
-      <LoginForm
+      <AuthFormShell
         onSubmit={submitCode}
         noValidate
         aria-label="Enter your code"
         pending={pending}
       >
-        <div className="login-head">
-          <LoginHeading>Check your email</LoginHeading>
-          <p className="login-lead">
-            If {email} has an Amentorz account, we sent it a 6-digit code. Enter
-            it below.
-          </p>
-        </div>
-        <LoginField
+        <AuthHead
+          title="Check your email"
+          lead={<>If {email} has an Amentorz account, we sent it a 6-digit code. Enter             it below.</>}
+        />
+        <AuthField
           name="otp"
           label="Code"
           inputMode="numeric"
@@ -274,35 +253,33 @@ export function RecoveryFlow({ portal }: { portal: Portal }) {
           aria-required
         />
         {errorLine}
-        <div className="login-stack">
-          <LoginSubmit pending={pending}>
+        <AuthStack>
+          <AuthSubmit pending={pending}>
             {pending ? "Checking…" : "Verify code"}
-          </LoginSubmit>
-          <LoginSecondaryButton
+          </AuthSubmit>
+          <AuthSecondaryButton
             disabled={pending || wait > 0}
             onClick={() => void run(() => sendCode(email))}
           >
             {wait > 0 ? `Resend code in ${wait}s` : "Resend code"}
-          </LoginSecondaryButton>
-        </div>
-      </LoginForm>
+          </AuthSecondaryButton>
+        </AuthStack>
+      </AuthFormShell>
     );
   }
 
   return (
-    <LoginForm
+    <AuthFormShell
       onSubmit={submitPassword}
       noValidate
       aria-label="Set a new password"
       pending={pending}
     >
-      <div className="login-head">
-        <LoginHeading>Set a new password</LoginHeading>
-        <p className="login-lead">
-          Choose a password you have not used on Amentorz before.
-        </p>
-      </div>
-      <LoginField
+      <AuthHead
+          title="Set a new password"
+          lead={<>Choose a password you have not used on Amentorz before.</>}
+        />
+      <AuthField
         name="newPassword"
         label="New password"
         type="password"
@@ -311,7 +288,7 @@ export function RecoveryFlow({ portal }: { portal: Portal }) {
         error={fields.newPassword}
         aria-required
       />
-      <LoginField
+      <AuthField
         name="confirmPassword"
         label="Confirm new password"
         type="password"
@@ -320,14 +297,12 @@ export function RecoveryFlow({ portal }: { portal: Portal }) {
         aria-required
       />
       {errorLine}
-      <div className="login-stack">
-        <LoginSubmit pending={pending}>
+      <AuthStack>
+        <AuthSubmit pending={pending}>
           {pending ? "Saving…" : "Save and log in"}
-        </LoginSubmit>
-        <Link className="login-secondary" href="/login">
-          Cancel
-        </Link>
-      </div>
-    </LoginForm>
+        </AuthSubmit>
+        <AuthLinkButton href="/login" variant="ghost">Cancel</AuthLinkButton>
+      </AuthStack>
+    </AuthFormShell>
   );
 }

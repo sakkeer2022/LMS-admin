@@ -1,116 +1,88 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Button, ButtonLink } from "../src/components/ui";
-import {
-  Form,
-  TextField,
-  PasswordField,
-  SelectField,
-  SubmitButton,
-} from "../src/components/ui";
+import type { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "../src/components/data-table/data-table";
+import { TablePagination } from "../src/components/data-table/table-pagination";
+import { initialsOf } from "../src/components/layout/initials";
+import { cn } from "../src/lib/utils";
 import { loginSchema } from "../src/features/auth/schemas/auth";
+import { platformSettingsSchema, settingsDefaults } from "../src/features/settings/schema";
 
-describe("shared field and submission contracts", () => {
-  it("associates labels, required state, descriptions and validation errors while preserving external descriptions", () => {
+type Row = { name: string; fee: number };
+const columns: ColumnDef<Row>[] = [
+  { accessorKey: "name", header: "Name" },
+  { accessorKey: "fee", header: "Fee", meta: { align: "right" } },
+];
+
+describe("DataTable", () => {
+  it("renders headers, rows and an accessible caption", () => {
     const html = renderToStaticMarkup(
-      <TextField
-        id="email"
-        name="email"
-        label="Email"
-        type="email"
-        required
-        description="Use your work address"
-        error="Invalid email"
-        aria-describedby="policy"
-        autoComplete="email"
-        readOnly
-        defaultValue="x"
-      />,
+      <DataTable caption="Fees" columns={columns} data={[{ name: "Aarav", fee: 1450 }]} />,
     );
-    expect(html).toContain('for="email"');
-    expect(html).toContain(
-      'aria-describedby="policy email-description email-error"',
-    );
-    expect(html).toContain('aria-invalid="true"');
-    for (const attribute of [
-      'required=""',
-      'readOnly=""',
-      'autoComplete="email"',
-      'name="email"',
-      'value="x"',
-    ])
-      expect(html).toContain(attribute);
-    expect(html).toContain('id="email-error"');
+    expect(html).toContain("<caption");
+    expect(html).toContain("Fees");
+    expect(html).toContain("Aarav");
+    expect(html).toContain("1450");
+    expect(html).toContain("text-right");
   });
-  it("generates unique field IDs and preserves select names and disabled state", () => {
+  it("shows the empty message only when there are no rows", () => {
     const html = renderToStaticMarkup(
-      <>
-        <TextField label="First name" />
-        <TextField label="Last name" />
-        <SelectField
-          id="status"
-          name="status"
-          label="Status"
-          disabled
-          defaultValue="active"
-        >
-          <option value="active">Active</option>
-        </SelectField>
-      </>,
+      <DataTable caption="Fees" columns={columns} data={[]} empty="Nothing here" />,
     );
-    const ids = [...html.matchAll(/<input[^>]+id="([^"]+)"/g)].map(
-      (match) => match[1],
-    );
-    expect(new Set(ids).size).toBe(2);
-    expect(html).toContain('for="status"');
-    expect(html).toContain('name="status"');
-    expect(html).toContain('disabled=""');
+    expect(html).toContain("Nothing here");
+    expect(html).toContain('colSpan="2"');
   });
-  it("keeps password hidden and its reveal control out of form submission", () => {
+  it("shows placeholders instead of rows while loading", () => {
     const html = renderToStaticMarkup(
-      <PasswordField
-        id="password"
-        name="password"
-        label="Password"
-        autoComplete="current-password"
-      />,
+      <DataTable caption="Fees" columns={columns} data={[{ name: "Aarav", fee: 1 }]} loading loadingRows={2} />,
     );
-    expect(html).toContain('type="password"');
-    expect(html).toContain('type="button"');
-    expect(html).toContain('aria-controls="password"');
-    expect(html).toContain('aria-label="Show password"');
-    expect(
-      renderToStaticMarkup(
-        <PasswordField label="Password" allowReveal={false} />,
-      ),
-    ).not.toContain("<button");
+    expect(html).not.toContain("Aarav");
+    expect(html.match(/<tr/g)).toHaveLength(3);
   });
-  it("disables a submitting form and exposes a busy, named submit button; ordinary actions never submit", () => {
+});
+
+describe("TablePagination", () => {
+  it("describes the visible range and disables the unavailable direction", () => {
     const html = renderToStaticMarkup(
-      <Form pending>
-        <TextField name="email" label="Email" />
-        <SubmitButton pending>Sign in</SubmitButton>
-      </Form>,
+      <TablePagination page={1} limit={6} total={214} noun="sessions" onPage={() => {}} />,
     );
-    expect(html).toContain('<fieldset disabled=""');
-    expect(html).toContain('aria-busy="true"');
-    expect(html).toContain('type="submit"');
-    expect(html).toContain("Please wait");
-    expect(renderToStaticMarkup(<Button>Retry</Button>)).toContain(
-      'type="button"',
+    expect(html).toContain("Showing 1–6 of 214 sessions");
+    expect(html).toMatch(/disabled="">Previous/);
+    expect(html).not.toMatch(/disabled="">Next/);
+  });
+  it("reports an empty result as 0–0", () => {
+    const html = renderToStaticMarkup(
+      <TablePagination page={1} limit={6} total={0} noun="users" onPage={() => {}} />,
     );
-    expect(
-      renderToStaticMarkup(
-        <ButtonLink href="/login" variant="primary">
-          Sign in
-        </ButtonLink>,
-      ),
-    ).toContain("ui-button--primary");
+    expect(html).toContain("Showing 0–0 of 0 users");
+  });
+});
+
+describe("helpers", () => {
+  it("builds initials from the first and last name, with a neutral mark before load", () => {
+    expect(initialsOf("Priya Nair")).toBe("PN");
+    expect(initialsOf("  priya  kumari  nair ")).toBe("PN");
+    expect(initialsOf("Priya")).toBe("P");
+    expect(initialsOf(undefined)).toBe("•");
+  });
+  it("lets the last Tailwind utility win when classes conflict", () => {
+    expect(cn("px-2", "px-4", false && "hidden")).toBe("px-4");
   });
   it("accepts any existing password at login and lowercases the email", () => {
     const parsed = loginSchema.parse({ email: "Person@example.com", password: "legacy" });
     expect(parsed.email).toBe("person@example.com");
     expect(parsed.rememberMe).toBe(false);
     expect(loginSchema.safeParse({ email: "person@example.com", password: "" }).success).toBe(false);
+  });
+});
+
+describe("platform settings form", () => {
+  it("accepts the design defaults", () => {
+    expect(platformSettingsSchema.safeParse(settingsDefaults).success).toBe(true);
+  });
+  it("rejects rates above 100, ratings above 10 and fractional counts", () => {
+    expect(platformSettingsSchema.safeParse({ ...settingsDefaults, gstRate: 101 }).success).toBe(false);
+    expect(platformSettingsSchema.safeParse({ ...settingsDefaults, fullPointsRating: 11 }).success).toBe(false);
+    expect(platformSettingsSchema.safeParse({ ...settingsDefaults, bookingWindowDays: 1.5 }).success).toBe(false);
   });
 });

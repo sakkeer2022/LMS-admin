@@ -1,6 +1,7 @@
 "use client";
-import { Button, Card, Typography } from "@/components/ui";
 import { useState, type ReactNode } from "react";
+import { Button } from "@/components/shadcn/button";
+import { Card, CardContent } from "@/components/shadcn/card";
 import { Can } from "./permission-provider";
 
 export function SensitiveBoundary({
@@ -16,16 +17,18 @@ export function SensitiveBoundary({
   return (
     <Can permission={permission}>
       <Card aria-label={label}>
-        <Typography>
-          Sensitive action: {label}. Activity must be audited by the backend.
-        </Typography>
-        {revealed ? (
-          children
-        ) : (
-          <Button onClick={() => setRevealed(true)}>
-            Review sensitive action
-          </Button>
-        )}
+        <CardContent className="flex flex-col items-start gap-3 py-5">
+          <p className="text-sm">
+            Sensitive action: {label}. Activity must be audited by the backend.
+          </p>
+          {revealed ? (
+            children
+          ) : (
+            <Button variant="outline" onClick={() => setRevealed(true)}>
+              Review sensitive action
+            </Button>
+          )}
+        </CardContent>
       </Card>
     </Can>
   );

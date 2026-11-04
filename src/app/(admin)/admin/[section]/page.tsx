@@ -1,14 +1,16 @@
 import { notFound } from "next/navigation";
-import { ExtensionPanel } from "@/components/ui/extension-panel";
+import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { FacultyDirectory } from "@/features/dashboard/faculty-directory";
+
 const sections: Record<string, string> = {
   faculty: "Faculty",
   bookings: "Bookings",
   reviews: "Reviews",
   progress: "Progress Reports",
   payouts: "Payouts",
-  settings: "Settings",
 };
+
 export default async function Page({
   params,
   searchParams,
@@ -21,9 +23,12 @@ export default async function Page({
   if (!sections[section]) notFound();
   if (section === "faculty") return <FacultyDirectory />;
   return (
-    <ExtensionPanel
-      title={sections[section]}
-      description={`${filter ? `Requested queue: ${filter}. ` : ""}This workflow requires a backend adapter. No operational changes are available in this starter.`}
-    />
+    <>
+      <PageHeader title={sections[section]} />
+      <EmptyState
+        title="Not available yet"
+        description={`${filter ? `Requested queue: ${filter}. ` : ""}This workflow needs a backend service that has not been connected.`}
+      />
+    </>
   );
 }

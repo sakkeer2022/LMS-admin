@@ -2,14 +2,14 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, Circle, CircleCheck, KeyRound, MailCheck } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { Form } from "@/components/ui/Form";
 import {
   SettingButton,
   SettingDialog,
   SettingField,
+  SettingForm,
   SettingInput,
   SettingPasswordInput,
-} from "@/components/ui/settings-layout";
+} from "@/components/settings/setting-layout";
 import {
   useChangePassword,
   useRequestChangeCode,
@@ -211,17 +211,17 @@ export function ChangePasswordDialog({
       }
     >
       {step === "done" ? (
-        <p className="sp-dialog__description" role="status">
+        <p className="text-sm text-text-secondary" role="status">
           Taking you to the login screen…
         </p>
       ) : (
-        <Form
+        <SettingForm
           id="change-password-form"
           onSubmit={submit}
           noValidate
           pending={busy}
         >
-          <div className="sp-dialog__fields">
+          <div className="flex flex-col gap-4">
             {step === "form" ? (
               <>
                 <SettingField
@@ -260,9 +260,9 @@ export function ChangePasswordDialog({
                     aria-required
                   />
                 </SettingField>
-                <ul className="sp-checklist" aria-label="Password requirements">
+                <ul className="grid gap-1.5 rounded-md bg-background px-3.5 py-3 text-xs text-text-secondary" aria-label="Password requirements">
                   {checks.map((check) => (
-                    <li key={check.label} data-met={check.met}>
+                    <li key={check.label} data-met={check.met} className="flex items-center gap-2 data-[met=true]:text-success-foreground">
                       {check.met ? (
                         <CircleCheck size={14} aria-hidden />
                       ) : (
@@ -296,7 +296,7 @@ export function ChangePasswordDialog({
                     autoFocus
                   />
                 </SettingField>
-                <p className="sp-dialog__description">
+                <p className="text-sm text-text-secondary">
                   Did not get it?{" "}
                   <SettingButton
                     variant="ghost"
@@ -310,12 +310,12 @@ export function ChangePasswordDialog({
               </>
             )}
             {error && (
-              <p className="sp-dialog__error" role="alert">
+              <p className="rounded-md bg-error-subtle px-3 py-2.5 text-sm text-error-foreground" role="alert">
                 {error}
               </p>
             )}
           </div>
-        </Form>
+        </SettingForm>
       )}
     </SettingDialog>
   );

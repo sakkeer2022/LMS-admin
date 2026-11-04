@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import { requireAdmin } from "@/lib/auth/server";
 import { PermissionProvider } from "@/components/security/permission-provider";
-import { AdminLayout } from "@/components/layout/admin/AdminLayout";
+import { AdminShell } from "@/components/layout/admin-shell";
 export default async function Layout({ children }: { children: ReactNode }) {
   const { permissions } = await requireAdmin();
   return (
     <PermissionProvider permissions={permissions}>
-      <AdminLayout>{children}</AdminLayout>
+      <AdminShell>{children}</AdminShell>
     </PermissionProvider>
   );
 }
