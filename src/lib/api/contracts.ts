@@ -10,6 +10,8 @@ export type ApiEnvelope<T> =
       success: false;
       message: string;
       errors?: Record<string, string[]>;
+      /** Machine-readable code of an operational error, e.g. STALE_VERSION */
+      code?: string;
       traceId?: string;
     };
 export class ApiError extends Error {
@@ -18,6 +20,7 @@ export class ApiError extends Error {
     message: string,
     public fields?: Record<string, string[]>,
     public traceId?: string,
+    public code?: string,
   ) {
     super(message);
     this.name = "ApiError";

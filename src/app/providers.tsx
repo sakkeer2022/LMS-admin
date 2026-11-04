@@ -22,7 +22,12 @@ export function Providers({ children }: { children: ReactNode }) {
     () =>
       new QueryClient({
         queryCache: new QueryCache({ onError: report }),
-        mutationCache: new MutationCache({ onError: report }),
+        // Forms that show the error next to their fields opt out with meta.inlineErrors
+        mutationCache: new MutationCache({
+          onError: (error, _variables, _context, mutation) => {
+            if (!mutation.meta?.inlineErrors) report(error);
+          },
+        }),
         defaultOptions: {
           queries: {
             staleTime: 30_000,

@@ -48,6 +48,12 @@ async function sharedRefresh() {
     refreshing = undefined;
   }));
 }
+/** Query string for api() paths: spaces as %20, since api() rejects "+" and other raw characters. */
+export function queryString(params: Record<string, string | undefined>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== '') search.set(key, value);
+  return search.toString().replace(/\+/g, '%20');
+}
 export async function api<T>(
   path: string,
   init: RequestInit = {},
@@ -91,6 +97,7 @@ export async function api<T>(
       body.message,
       !body.success ? body.errors : undefined,
       !body.success ? body.traceId : undefined,
+      !body.success ? body.code : undefined,
     );
   return body;
 }
