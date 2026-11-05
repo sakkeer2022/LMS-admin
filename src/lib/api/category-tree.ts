@@ -5,8 +5,9 @@ import { api, queryString } from './client';
 import { applyRelocation, applyRename, applyReorder, relocation, type Placement } from './category-tree-model';
 
 // Contract: amentorz-backend src/modules/category-tree (category-tree.routes.ts,
-// category-tree.dto.ts, category-tree.reads.ts), ADR-0005. Lives in lib because the
-// admin tree and the learner catalogue (different features) both use it.
+// category-tree.dto.ts, category-tree.reads.ts), ADR-0005. The admin manages only the
+// tree: names, order, active state. A category without sub-categories is a leaf, the
+// thing tutors pick on onboarding (migration 20261105090000_category_simple_leaves).
 
 const node = z.object({
   id: z.string(),
@@ -15,15 +16,14 @@ const node = z.object({
   name: z.string(),
   path: z.string(),
   depth: z.number(),
-  isBookable: z.boolean(),
-  requiresBoard: z.boolean(),
-  requiresLevel: z.boolean(),
+  /** No sub-categories: the category tutors and learners choose */
+  isLeaf: z.boolean(),
   isActive: z.boolean(),
   displayOrder: z.number(),
   version: z.number(),
   childrenCount: z.number(),
-  curriculaCount: z.number(),
-  subtreeCurriculaCount: z.number(),
+  /** Tutors teaching a leaf (0 for a category with sub-categories) */
+  tutorCount: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -31,31 +31,17 @@ export type CategoryNode = z.infer<typeof node>;
 
 export const categoryTreeSchema = z.object({
   nodes: z.array(node),
-  stats: z.object({ categories: z.number(), bookableLeaves: z.number(), curricula: z.number() }),
+  stats: z.object({ categories: z.number(), leaves: z.number() }),
   generatedAt: z.string(),
 });
 export type CategoryTree = z.infer<typeof categoryTreeSchema>;
 
-export const categoryDetailSchema = node.omit({ subtreeCurriculaCount: true }).extend({
+export const categoryDetailSchema = node.extend({
   description: z.string().nullable(),
   breadcrumb: z.array(z.object({ id: z.string(), name: z.string(), path: z.string() })),
-  allowedLevels: z.array(z.object({ id: z.string(), code: z.string(), name: z.string(), isActive: z.boolean() })),
-  activeCurriculaCount: z.number(),
-  studentCount: z.number(),
   descendantCount: z.number(),
 });
 export type CategoryDetail = z.infer<typeof categoryDetailSchema>;
-
-const named = z.object({ id: z.string(), name: z.string() });
-export const offeringSchema = z.object({
-  curriculumId: z.string(),
-  categoryId: z.string(),
-  subject: named,
-  board: named.nullable(),
-  level: named.nullable(),
-  isActive: z.boolean(),
-});
-export type Offering = z.infer<typeof offeringSchema>;
 
 const lookup = z.object({ id: z.string(), code: z.string(), name: z.string(), isActive: z.boolean(), sortOrder: z.number() });
 export type Lookup = z.infer<typeof lookup>;
@@ -71,7 +57,6 @@ export const categoryTreeKeys = {
   all: () => ['category-tree'] as const,
   tree: () => ['category-tree', 'tree'] as const,
   detail: (id: string) => ['category-tree', 'detail', id] as const,
-  offerings: (id: string) => ['category-tree', 'offerings', id] as const,
   lookups: (kind: 'levels' | 'boards' | 'subjects') => ['category-tree', 'lookups', kind] as const,
 };
 
@@ -98,15 +83,7 @@ export function useCategoryDetail(id: string | undefined) {
   });
 }
 
-export function useOfferings(id: string | undefined) {
-  return useQuery({
-    queryKey: categoryTreeKeys.offerings(id ?? ''),
-    enabled: Boolean(id),
-    queryFn: ({ signal }) => getData(z.array(offeringSchema), `${at(id!)}/offerings`, signal),
-  });
-}
-
-/** Lookup lists for the forms (board, level and subject are managed on their own screens). */
+/** Lookup lists (board, level and subject), used by the pricing filters. */
 export function useLookup(kind: 'levels' | 'boards' | 'subjects', enabled = true) {
   const path = kind === 'levels' ? '/admin/catalogue/levels' : `/admin/catalogue/${kind}`;
   return useQuery({
@@ -153,10 +130,6 @@ export const useUpdateCategory = () =>
     (nodes, { id, name, isActive }) => applyRename(nodes, id, { ...(name !== undefined && { name }), ...(isActive !== undefined && { isActive }) })
   );
 
-export const useSaveLeafSettings = () =>
-  useTreeMutation(async ({ id, ...body }: { id: string; version: number; isBookable: boolean; requiresBoard: boolean; requiresLevel: boolean; levelIds: string[] }) =>
-    categoryDetailSchema.parse((await api<unknown>(`${at(id)}/leaf-settings`, json('PUT', body))).data));
-
 export const useReorderCategories = () =>
   useTreeMutation(async (body: { parentId: string | null; orderedIds: string[] }) => (await api<unknown>(`${base}/reorder`, json('PUT', body))).data,
     (nodes, { orderedIds }) => applyReorder(nodes, orderedIds)
@@ -182,11 +155,3 @@ export const useDeleteCategory = () =>
   useTreeMutation(async ({ id, version }: { id: string; version: number }) => {
     await api<null>(`${at(id)}?${queryString({ version: String(version) })}`, { method: 'DELETE' });
   });
-
-export const useAddOffering = () =>
-  useTreeMutation(async ({ categoryId, ...body }: { categoryId: string; subjectId: string; boardId: string | null; levelId: string | null }) =>
-    offeringSchema.parse((await api<unknown>(`${at(categoryId)}/offerings`, json('POST', body))).data));
-
-export const useSetOfferingActive = () =>
-  useTreeMutation(async ({ curriculumId, isActive }: { curriculumId: string; isActive: boolean }) =>
-    offeringSchema.parse((await api<unknown>(`${base}/offerings/${encodeURIComponent(curriculumId)}`, json('PATCH', { isActive }))).data));

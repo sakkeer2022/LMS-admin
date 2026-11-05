@@ -4,7 +4,9 @@ import { z } from 'zod';
 import { api } from './client';
 
 // Contract: amentorz-backend GET /admin/category-tree/picker (getCategoryTreePicker),
-// the same shape as the faculty onboarding catalogue (category-tree.picker.ts).
+// the same shape as the faculty onboarding catalogue (category-tree.picker.ts). Each leaf
+// (a category without sub-categories) has one offering: its category curriculum, whose
+// subject is the leaf itself and whose board and level are null.
 
 const named = z.object({ id: z.string(), name: z.string() });
 
@@ -16,16 +18,16 @@ export const offeringTreeSchema = z.object({
 });
 export type OfferingTree = z.infer<typeof offeringTreeSchema>;
 
-/** One bookable offering with its category path, ready for a select. */
+/** One offering (a leaf) with its category path, ready for a select. */
 export interface PickerOffering {
   curriculumId: string;
   categoryId: string;
-  /** "Academic › School › K-12" */
+  /** "School › K-12 › CBSE › Physics › Class 11" */
   categoryLabel: string;
   subject: string;
   board: string | null;
   level: string | null;
-  /** "Physics · CBSE · Class 11" */
+  /** The leaf's path ("School › K-12 › CBSE › Physics › Class 11") */
   label: string;
 }
 
@@ -62,15 +64,11 @@ export function pickerOfferings(tree: OfferingTree | undefined): PickerOffering[
         subject: o.subject.name,
         board: o.board?.name ?? null,
         level: o.level?.name ?? null,
-        label: [o.subject.name, o.board?.name, o.level?.name].filter(Boolean).join(' · '),
+        // A category curriculum is the leaf itself; older subject offerings keep their parts
+        label: o.subject.id === o.categoryId
+          ? categoryLabel
+          : [o.subject.name, o.board?.name, o.level?.name].filter(Boolean).join(' · '),
       };
     })
     .sort((a, b) => a.categoryLabel.localeCompare(b.categoryLabel) || a.label.localeCompare(b.label));
-}
-
-/** Distinct categories (leaves) that have offerings, in order. */
-export function pickerCategories(offerings: readonly PickerOffering[]) {
-  const seen = new Map<string, string>();
-  for (const o of offerings) if (!seen.has(o.categoryId)) seen.set(o.categoryId, o.categoryLabel);
-  return [...seen].map(([id, label]) => ({ id, label }));
 }

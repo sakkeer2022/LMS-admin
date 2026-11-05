@@ -30,43 +30,42 @@ describe('bulk price edit tracking (screen 29b)', () => {
 
 
 import { awaitingPriceSchema } from '../src/lib/api/pricing';
-import { offeringTreeSchema, pickerCategories, pickerOfferings } from '../src/lib/api/offering-tree';
+import { offeringTreeSchema, pickerOfferings } from '../src/lib/api/offering-tree';
 import { groupByTutor, presetFor } from '../src/features/pricing/components/awaiting-prices';
 import { chosenOffering } from '../src/features/pricing/components/offering-picker';
 
 const tree = offeringTreeSchema.parse({
   nodes: [
-    { id: 'a', parentId: null, name: 'Academic', isLeaf: false },
-    { id: 's', parentId: 'a', name: 'School', isLeaf: false },
-    { id: 'k', parentId: 's', name: 'K-12', isLeaf: true },
-    { id: 'u', parentId: 'a', name: 'University', isLeaf: true },
+    { id: 's', parentId: null, name: 'School', isLeaf: false },
+    { id: 'k', parentId: 's', name: 'K-12', isLeaf: false },
+    { id: 'p', parentId: 'k', name: 'Physics', isLeaf: false },
+    { id: 'p11', parentId: 'p', name: 'Class 11', isLeaf: true },
+    { id: 'p12', parentId: 'p', name: 'Class 12', isLeaf: true },
+    { id: 'u', parentId: null, name: 'University', isLeaf: true },
   ],
+  // One category curriculum per leaf: the subject is the leaf, board and level are null
   offerings: [
-    { curriculumId: 'c2', categoryId: 'k', board: { id: 'b', name: 'CBSE' }, level: { id: 'l', name: 'Class 11' }, subject: { id: 'p', name: 'Physics' } },
-    { curriculumId: 'c1', categoryId: 'k', board: { id: 'b', name: 'CBSE' }, level: { id: 'l', name: 'Class 11' }, subject: { id: 'c', name: 'Chemistry' } },
-    { curriculumId: 'c3', categoryId: 'u', board: null, level: null, subject: { id: 'm', name: 'Maths' } },
+    { curriculumId: 'c12', categoryId: 'p12', board: null, level: null, subject: { id: 'p12', name: 'Class 12' } },
+    { curriculumId: 'c11', categoryId: 'p11', board: null, level: null, subject: { id: 'p11', name: 'Class 11' } },
+    { curriculumId: 'cu', categoryId: 'u', board: null, level: null, subject: { id: 'u', name: 'University' } },
   ],
 });
 
 describe('offering picker (GET /admin/category-tree/picker)', () => {
-  it('labels each offering with its category path and sorts by path then subject', () => {
+  it('labels each leaf with its full path and sorts by path', () => {
     const offerings = pickerOfferings(tree);
-    expect(offerings.map((o) => [o.categoryLabel, o.label])).toEqual([
-      ['Academic › School › K-12', 'Chemistry · CBSE · Class 11'],
-      ['Academic › School › K-12', 'Physics · CBSE · Class 11'],
-      ['Academic › University', 'Maths'],
-    ]);
-    expect(pickerCategories(offerings)).toEqual([
-      { id: 'k', label: 'Academic › School › K-12' },
-      { id: 'u', label: 'Academic › University' },
+    expect(offerings.map((o) => [o.curriculumId, o.label])).toEqual([
+      ['c11', 'School › K-12 › Physics › Class 11'],
+      ['c12', 'School › K-12 › Physics › Class 12'],
+      ['cu', 'University'],
     ]);
     expect(pickerOfferings(undefined)).toEqual([]);
   });
   it('finds the offering only for a complete, matching choice', () => {
     const offerings = pickerOfferings(tree);
-    expect(chosenOffering(offerings, { categoryId: 'k', curriculumId: 'c2' })?.subject).toBe('Physics');
-    expect(chosenOffering(offerings, { categoryId: 'u', curriculumId: 'c2' })).toBeUndefined();
-    expect(chosenOffering(offerings, { categoryId: 'k', curriculumId: '' })).toBeUndefined();
+    expect(chosenOffering(offerings, { categoryId: 'p11', curriculumId: 'c11' })?.subject).toBe('Class 11');
+    expect(chosenOffering(offerings, { categoryId: 'u', curriculumId: 'c11' })).toBeUndefined();
+    expect(chosenOffering(offerings, { categoryId: 'p11', curriculumId: '' })).toBeUndefined();
   });
 });
 

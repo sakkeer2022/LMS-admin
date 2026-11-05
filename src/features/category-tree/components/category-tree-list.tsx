@@ -255,10 +255,11 @@ function SortableRow({ row, list, focused, projectedDepth, invalid, onFocusRow }
   const pending = pendingIds.has(node.id);
   const style: CSSProperties = { transform: DndCSS.Translate.toString(transform), transition };
 
-  const actions: ReactNode = canManage && !reorder && <div className="flex shrink-0 items-center gap-1"
+  // As in the design, the switch, Edit and Delete show only on the selected row
+  const actions: ReactNode = canManage && selected && <div className="flex shrink-0 items-center gap-1"
     onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
     <Switch checked={node.isActive} disabled={pending} tabIndex={-1}
-      aria-label={`${node.isActive ? 'Deactivate' : 'Activate'} ${node.name}`} onCheckedChange={(value) => onToggleActive(node, value)} />
+      aria-label={`${node.isActive ? 'Disable' : 'Enable'} ${node.name}`} onCheckedChange={(value) => onToggleActive(node, value)} />
     <Button size="icon-sm" variant="ghost" tabIndex={-1} aria-label={`Edit ${node.name}`} title="Edit" disabled={pending}
       className="size-7" onClick={() => onEdit(node)}>
       <Pencil size={14} aria-hidden="true" />
@@ -295,7 +296,6 @@ function SortableRow({ row, list, focused, projectedDepth, invalid, onFocusRow }
         : <span className="inline-block w-5 shrink-0" aria-hidden="true" />}
       <NodeIcon node={node} />
       <span className={cx('min-w-0 truncate text-sm', node.depth === 0 && 'font-semibold')}>{node.name}</span>
-      {node.isBookable && <Badge variant="info" className="shrink-0">Bookable</Badge>}
       {!node.isActive && <Badge variant="warning" className="shrink-0">Inactive</Badge>}
       <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums" title={rowCountLabel(node)} aria-hidden="true">
         {rowCount(node)}

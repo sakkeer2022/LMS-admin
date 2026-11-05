@@ -12,11 +12,9 @@ import { usePermission } from '@/components/security/permission-provider';
 import { describeApiError } from '@/lib/api/errors';
 import { useCategoryTree, useRelocateCategory, useUpdateCategory, type CategoryNode } from '@/lib/api/category-tree';
 import { buildTree, expandableIds, relocation, searchMatches, visibleRows, type Placement } from '@/lib/api/category-tree-model';
-import { CategoryDetailPanel, Rows } from './category-detail-panel';
-import { CategoryFormDialog, DeleteCategoryDialog, type FormState } from './category-dialogs';
+import { CategoryDetailPanel, CategoryForm, Rows, type PanelMode } from './category-detail-panel';
+import { DeleteCategoryDialog } from './category-dialogs';
 import { CategoryTreeList, type TreeRow } from './category-tree-list';
-
-type Dialog = { kind: 'form'; state: FormState } | { kind: 'delete'; node: CategoryNode } | null;
 
 function useDebounced<T>(value: T, ms: number) {
   const [debounced, setDebounced] = useState(value);
@@ -24,13 +22,15 @@ function useDebounced<T>(value: T, ms: number) {
   return debounced;
 }
 
-const timeFormat = new Intl.DateTimeFormat('en-IN', { timeStyle: 'short', timeZone: 'Asia/Kolkata' });
-
 /**
- * Admin › Categories & content (screen 28). The tree is loaded once per session and
- * cached; children render only when expanded. Reorder mode dims the page and makes the
- * tree draggable: drop to reorder siblings, drag right or left to change the parent.
- * Writes are optimistic and roll back when the server refuses them.
+ * Admin › Categories & content (screen 28). Categories and sub-categories only: add,
+ * rename, enable or disable, delete and reorder. A category without sub-categories is
+ * what tutors pick on onboarding, so the tree here is the one they see.
+ * The tree is loaded once per session and cached; children render only when expanded.
+ * Reorder mode dims the page and makes the tree draggable: drop to reorder siblings, drag
+ * right or left to change the parent. Writes are optimistic and roll back when the server
+ * refuses them. Selecting a row shows its switch, Edit and Delete; Edit opens the
+ * "Edit category" form in the right column.
  */
 export function CategoryTreePage() {
   const canRead = usePermission('catalogue.read');
@@ -42,7 +42,8 @@ export function CategoryTreePage() {
   const q = useDebounced(search, 200);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string>();
-  const [dialog, setDialog] = useState<Dialog>(null);
+  const [panel, setPanel] = useState<PanelMode>({ kind: 'view' });
+  const [deleting, setDeleting] = useState<CategoryNode>();
   const [reorder, setReorder] = useState(false);
   const [notice, setNotice] = useState<{ tone: 'danger' | 'info'; text: string; stale?: boolean }>();
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
@@ -63,7 +64,7 @@ export function CategoryTreePage() {
     if (nodes.length && expanded.size === 0) setExpanded(new Set(nodes.filter((n) => n.depth === 0).map((n) => n.id)));
   }, [nodes.length]);
 
-  // Escape leaves reorder mode (dialogs are closed while it is on)
+  // Escape leaves reorder mode (forms and dialogs are closed while it is on)
   useEffect(() => {
     if (!reorder) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !dragging.current) setReorder(false); };
@@ -76,6 +77,13 @@ export function CategoryTreePage() {
     setNotice({ tone: 'danger', text: described.message, stale: described.kind === 'stale' });
   };
   const refresh = () => { setNotice(undefined); void tree.refetch(); };
+  const select = (node: CategoryNode) => {
+    setSelectedId(node.id);
+    // Moving to another row leaves an open form
+    setPanel((current) => (current.kind === 'edit' && current.node.id === node.id ? current : { kind: 'view' }));
+  };
+  const edit = (node: CategoryNode) => { setSelectedId(node.id); setPanel({ kind: 'edit', node }); };
+  const addUnder = (parent: CategoryNode | null) => setPanel({ kind: 'create', parent });
   const track = (id: string, on: boolean) => setPendingIds((current) => {
     const next = new Set(current);
     if (on) next.add(id); else next.delete(id);
@@ -111,8 +119,8 @@ export function CategoryTreePage() {
 
   const stats = tree.data?.stats;
   const subtitle = stats
-    ? `Category → sub-category → bookable category · ${stats.categories.toLocaleString('en-IN')} categories · ${stats.bookableLeaves.toLocaleString('en-IN')} bookable · ${stats.curricula.toLocaleString('en-IN')} curricula`
-    : 'Category → sub-category → bookable category';
+    ? `Categories and sub-categories that tutors choose from · ${stats.categories.toLocaleString('en-IN')} categories`
+    : 'Categories and sub-categories that tutors choose from';
 
   const treeCard = <Card className={cx('relative flex min-w-0 flex-col gap-0 overflow-hidden py-0 transition-shadow duration-200',
     reorder && 'z-50 shadow-[0_0_0_2px_var(--primary),0_24px_48px_rgb(15_23_42/0.25)]')}>
@@ -146,21 +154,16 @@ export function CategoryTreePage() {
         : tree.isError ? <div className="p-5"><PanelMessage onRetry={() => void tree.refetch()}>The categories could not be loaded. {describeApiError(tree.error, 'view the catalogue').message}</PanelMessage></div>
         : nodes.length === 0 ? <div className="flex flex-col items-start gap-3 p-5">
             <p className="text-sm">There are no categories yet. Start with a root such as Academic.</p>
-            {canManage && <Button onClick={() => setDialog({ kind: 'form', state: { mode: 'create', parent: null } })}>Add category</Button>}
+            {canManage && <Button onClick={() => addUnder(null)}>Add category</Button>}
           </div>
         : rows.length === 0 ? <p className="p-5 text-sm text-muted-foreground">Nothing matches “{q}”.</p>
         : <CategoryTreeList rows={rows} nodes={nodes} expanded={open} onToggle={toggle} selectedId={selectedId}
-            onSelect={(node) => setSelectedId(node.id)} reorder={reorder} onRelocate={onRelocate}
+            onSelect={select} reorder={reorder} onRelocate={onRelocate}
             onInvalidDrop={(text) => setNotice({ tone: 'danger', text })} canManage={canManage} pendingIds={pendingIds}
-            onEdit={(node) => setDialog({ kind: 'form', state: { mode: 'edit', node } })}
-            onDelete={(node) => setDialog({ kind: 'delete', node })} onToggleActive={onToggleActive}
+            onEdit={edit} onDelete={setDeleting} onToggleActive={onToggleActive}
             onDraggingChange={(value) => { dragging.current = value; }} />}
     </div>
 
-    {tree.data && <div className="flex items-center gap-2 px-5 py-2">
-      <span className="text-xs text-muted-foreground">Loaded at {timeFormat.format(new Date(tree.data.generatedAt))}{tree.isFetching ? ' · refreshing…' : ''}</span>
-      <Button size="sm" variant="ghost" onClick={refresh} disabled={tree.isFetching}>Refresh</Button>
-    </div>}
   </Card>;
 
   return <div className="flex flex-col gap-4">
@@ -169,12 +172,12 @@ export function CategoryTreePage() {
       reorder ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0')} />
 
     <PageHeader title="Categories & content" description={subtitle} actions={canManage && <>
-      <Button variant="outline" onClick={() => { setReorder((r) => !r); setDialog(null); }} aria-pressed={reorder}
+      <Button variant="outline" onClick={() => { setReorder((r) => !r); setPanel({ kind: 'view' }); setDeleting(undefined); }} aria-pressed={reorder}
         disabled={!nodes.length} className={cx('relative', reorder && 'z-50 border-primary text-primary')}>
         {reorder ? 'Done reordering' : 'Reorder'}
       </Button>
       <Button inert={reorder} title="Add a top-level category"
-        onClick={() => setDialog({ kind: 'form', state: { mode: 'create', parent: null } })}>Add category</Button>
+        onClick={() => addUnder(null)}>Add category</Button>
     </>} />
 
     {notice && <Card className={cx('relative flex-row flex-wrap items-center gap-3 p-3', reorder && 'z-50')} role="alert">
@@ -191,25 +194,23 @@ export function CategoryTreePage() {
         <div className="grid items-start gap-4 pt-4 lg:grid-cols-[minmax(0,1.85fr)_minmax(300px,1fr)]">
           {treeCard}
           <div className="min-w-0" inert={reorder}>
-            <CategoryDetailPanel node={selected} canManage={canManage} pending={selected ? pendingIds.has(selected.id) : false}
-              onAddChild={(parent) => setDialog({ kind: 'form', state: { mode: 'create', parent } })}
-              onEdit={(node) => setDialog({ kind: 'form', state: { mode: 'edit', node } })}
-              onDelete={(node) => setDialog({ kind: 'delete', node })}
-              onToggleActive={onToggleActive}
-              onError={report} />
+            {panel.kind === 'view' || !canManage
+              ? <CategoryDetailPanel node={selected} canManage={canManage} pending={selected ? pendingIds.has(selected.id) : false}
+                  onAddChild={addUnder} onEdit={edit} onDelete={setDeleting} onToggleActive={onToggleActive} />
+              : <CategoryForm key={panel.kind === 'edit' ? `edit-${panel.node.id}` : `create-${panel.parent?.id ?? 'root'}`}
+                  mode={panel.kind === 'edit' ? { kind: 'edit', node: nodes.find((n) => n.id === panel.node.id) ?? panel.node } : panel}
+                  nodes={nodes} onCancel={() => setPanel({ kind: 'view' })}
+                  onSaved={(id) => {
+                    if (panel.kind === 'create' && panel.parent) toggle(panel.parent.id, true);
+                    setSelectedId(id);
+                    setPanel({ kind: 'view' });
+                  }} />}
           </div>
         </div>
       </TabsContent>
     </Tabs>
 
-    {dialog?.kind === 'form' && <CategoryFormDialog state={dialog.state} nodes={nodes} onClose={() => setDialog(null)}
-      onSaved={(id) => {
-        const parent = dialog.state.mode === 'create' ? dialog.state.parent : null;
-        setDialog(null);
-        setSelectedId(id);
-        if (parent) toggle(parent.id, true);
-      }} />}
-    {dialog?.kind === 'delete' && <DeleteCategoryDialog node={dialog.node} onClose={() => setDialog(null)}
-      onDeleted={() => { setDialog(null); setSelectedId(undefined); }} />}
+    {deleting && <DeleteCategoryDialog node={nodes.find((n) => n.id === deleting.id) ?? deleting} onClose={() => setDeleting(undefined)}
+      onDeleted={() => { setDeleting(undefined); setSelectedId(undefined); setPanel({ kind: 'view' }); }} />}
   </div>;
 }

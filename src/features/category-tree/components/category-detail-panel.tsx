@@ -1,7 +1,7 @@
 "use client";
-import { useState, type ReactNode } from 'react';
-import { Plus } from 'lucide-react';
-import { CheckField, SelectField } from '@/components/forms/field';
+import { useState, type FormEvent, type ReactNode } from 'react';
+import { Plus, X } from 'lucide-react';
+import { TextField } from '@/components/forms/field';
 import { PanelMessage } from '@/components/layout/panel-message';
 import { Badge } from '@/components/shadcn/badge';
 import { Button } from '@/components/shadcn/button';
@@ -9,20 +9,22 @@ import { Card } from '@/components/shadcn/card';
 import { Skeleton } from '@/components/shadcn/skeleton';
 import { Switch } from '@/components/shadcn/switch';
 import { describeApiError } from '@/lib/api/errors';
-import {
-  useAddOffering, useCategoryDetail, useLookup, useOfferings, useSetOfferingActive,
-  type CategoryDetail, type CategoryNode,
-} from '@/lib/api/category-tree';
-import { addChildBlockedReason, curriculaLabel } from '@/lib/api/category-tree-model';
+import { useCategoryDetail, useCreateCategory, useUpdateCategory, type CategoryDetail, type CategoryNode } from '@/lib/api/category-tree';
+import { addChildBlockedReason, breadcrumb, uniqueSiblingCode } from '@/lib/api/category-tree-model';
 
 const dateFormat = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'Asia/Kolkata' });
+
+/** What the right column shows: the selected category, or the add / edit form. */
+export type PanelMode =
+  | { kind: 'view' }
+  | { kind: 'edit'; node: CategoryNode }
+  | { kind: 'create'; parent: CategoryNode | null };
 
 interface Actions {
   onAddChild: (node: CategoryNode) => void;
   onEdit: (node: CategoryNode) => void;
   onDelete: (node: CategoryNode) => void;
   onToggleActive: (node: CategoryNode, isActive: boolean) => void;
-  onError: (error: unknown, action: string) => void;
 }
 
 export function Rows({ count }: { count: number }) {
@@ -54,10 +56,11 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * Same entity and the same actions as the tree row: the Active switch, Edit and Delete.
- * The tree's cached node drives the switch, so a change in either place shows in both.
+ * Same entity and the same actions as the selected tree row: the Active switch, Edit and
+ * Delete, plus Add sub-category. The tree's cached node drives the switch, so a change
+ * in either place shows in both.
  */
-export function CategoryDetailView({ detail, node, canManage, pending, onAddChild, onEdit, onDelete, onToggleActive, onError }: Actions & {
+export function CategoryDetailView({ detail, node, canManage, pending, onAddChild, onEdit, onDelete, onToggleActive }: Actions & {
   detail: CategoryDetail;
   node: CategoryNode;
   canManage: boolean;
@@ -65,14 +68,13 @@ export function CategoryDetailView({ detail, node, canManage, pending, onAddChil
 }) {
   const blocked = addChildBlockedReason(node);
   const isLeaf = node.childrenCount === 0;
-  const showCurricula = node.isBookable;
 
   return <Card className="gap-0 py-0">
     <div className="flex flex-col gap-4 p-5">
       <div className="flex flex-col gap-1">
         <div className="flex items-start justify-between gap-3">
           <h2 className="min-w-0 text-lg font-semibold break-words">{node.name}</h2>
-          {canManage && <Switch checked={node.isActive} disabled={pending} aria-label={`${node.isActive ? 'Deactivate' : 'Activate'} ${node.name}`}
+          {canManage && <Switch checked={node.isActive} disabled={pending} aria-label={`${node.isActive ? 'Disable' : 'Enable'} ${node.name}`}
             onCheckedChange={(value) => onToggleActive(node, value)} />}
         </div>
         <p className="text-xs text-muted-foreground" aria-label="Path">
@@ -88,15 +90,15 @@ export function CategoryDetailView({ detail, node, canManage, pending, onAddChil
         </Row>
         <Row label="Created"><span className="font-semibold">{dateFormat.format(new Date(detail.createdAt))}</span></Row>
       </dl>
-      {!node.isActive && <p className="text-xs text-muted-foreground">Hidden from learners, with everything below it.</p>}
+      {!node.isActive && <p className="text-xs text-muted-foreground">Hidden from tutors and learners, with everything below it.</p>}
     </div>
 
     <div className="flex flex-col gap-4 border-t p-5">
       <div className="flex flex-col gap-1 rounded-md border px-4 py-4">
         <p className="text-2xl font-bold tabular-nums">
-          {(showCurricula ? node.curriculaCount : node.childrenCount).toLocaleString('en-IN')}
+          {(isLeaf ? node.tutorCount : node.childrenCount).toLocaleString('en-IN')}
         </p>
-        <span className="text-xs text-muted-foreground">{showCurricula ? 'Curricula' : 'Sub category count'}</span>
+        <span className="text-xs text-muted-foreground">{isLeaf ? 'Tutor count' : 'Sub category count'}</span>
       </div>
 
       {canManage && <div className="flex flex-wrap items-center gap-2">
@@ -109,75 +111,68 @@ export function CategoryDetailView({ detail, node, canManage, pending, onAddChil
       </div>}
       {canManage && blocked && <p id={`add-blocked-${node.id}`} className="text-xs text-muted-foreground">{blocked}</p>}
     </div>
-
-    {isLeaf && (node.isBookable || detail.requiresLevel) && <div className="flex flex-col gap-3 border-t p-5">
-      <h3 className="text-sm font-semibold">Booking</h3>
-      <dl className="m-0 flex flex-col gap-2">
-        <Row label="Bookable">{node.isBookable ? 'Yes' : 'No'}</Row>
-        {node.isBookable && <Row label="Learner chooses">
-          {[detail.requiresBoard && 'board', detail.requiresLevel && 'level', 'subject'].filter(Boolean).join(', ')}
-        </Row>}
-      </dl>
-      {detail.requiresLevel && <div className="flex flex-col gap-1">
-        <p className="text-xs text-muted-foreground">Allowed levels</p>
-        <div className="flex flex-wrap gap-1">
-          {detail.allowedLevels.length ? detail.allowedLevels.map((l) => <Badge key={l.id} variant={l.isActive ? 'secondary' : 'warning'}>{l.name}</Badge>)
-            : <p className="text-sm text-muted-foreground">None yet. Choose levels in Edit.</p>}
-        </div>
-      </div>}
-      {node.isBookable && <OfferingsSection detail={detail} canManage={canManage} onError={onError} />}
-    </div>}
   </Card>;
 }
 
-/** The leaf's offerings: each is a subject with an optional board and level (a curriculum). */
-function OfferingsSection({ detail, canManage, onError }: { detail: CategoryDetail; canManage: boolean; onError: Actions['onError'] }) {
-  const offerings = useOfferings(detail.id);
-  const subjects = useLookup('subjects', canManage);
-  const boards = useLookup('boards', canManage && detail.requiresBoard);
-  const add = useAddOffering();
-  const toggle = useSetOfferingActive();
-  const [form, setForm] = useState({ subjectId: '', boardId: '', levelId: '' });
+/**
+ * "Edit category" (as in the design) and the same form for adding a category or a
+ * sub-category: the name is the only field. The code in the path is made from the name
+ * when the category is created and is not changed by a rename.
+ */
+export function CategoryForm({ mode, nodes, onCancel, onSaved }: {
+  mode: Exclude<PanelMode, { kind: 'view' }>;
+  nodes: readonly CategoryNode[];
+  onCancel: () => void;
+  onSaved: (id: string) => void;
+}) {
+  const create = useCreateCategory();
+  const update = useUpdateCategory();
+  const editing = mode.kind === 'edit' ? mode.node : undefined;
+  const parent = mode.kind === 'create' ? mode.parent : null;
+  const [name, setName] = useState(editing?.name ?? '');
   const [error, setError] = useState<string>();
-  const ready = form.subjectId && (!detail.requiresBoard || form.boardId) && (!detail.requiresLevel || form.levelId);
+  const pending = create.isPending || update.isPending;
+  const trimmed = name.trim();
 
-  return <div className="flex flex-col gap-2">
-    <h3 className="text-sm font-semibold">Offerings ({offerings.data ? curriculaLabel(offerings.data.length) : '…'})</h3>
-    {offerings.isPending ? <Rows count={2} />
-      : offerings.isError ? <PanelMessage onRetry={() => void offerings.refetch()}>Offerings could not be loaded.</PanelMessage>
-      : offerings.data.length === 0 ? <p className="text-sm text-muted-foreground">No offerings yet, so learners cannot book this category.</p>
-      : <ul className="flex flex-col gap-1">
-          {offerings.data.map((o) => {
-            const label = [o.board?.name, o.subject.name, o.level?.name].filter(Boolean).join(' · ');
-            return <li key={o.curriculumId} className="flex items-center justify-between gap-2">
-              <span className="text-sm">{label}</span>
-              {canManage ? <CheckField label="Active" aria-label={`Active: ${label}`} checked={o.isActive}
-                onCheckedChange={(checked) => toggle.mutate({ curriculumId: o.curriculumId, isActive: checked === true }, { onError: (err) => onError(err, 'change the offering') })} />
-                : !o.isActive && <Badge variant="warning">Inactive</Badge>}
-            </li>;
-          })}
-        </ul>}
-    {canManage && <div className="flex flex-wrap items-end gap-2">
-      <SelectField label="Subject" containerClassName="min-w-32 flex-1" value={form.subjectId} onChange={(e) => setForm({ ...form, subjectId: e.target.value })}>
-        <option value="">Choose…</option>
-        {subjects.data?.filter((s) => s.isActive).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </SelectField>
-      {detail.requiresBoard && <SelectField label="Board" containerClassName="min-w-32 flex-1" value={form.boardId} onChange={(e) => setForm({ ...form, boardId: e.target.value })}>
-        <option value="">Choose…</option>
-        {boards.data?.filter((b) => b.isActive).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-      </SelectField>}
-      {detail.requiresLevel && <SelectField label="Level" containerClassName="min-w-32 flex-1" value={form.levelId} onChange={(e) => setForm({ ...form, levelId: e.target.value })}>
-        <option value="">Choose…</option>
-        {detail.allowedLevels.filter((l) => l.isActive).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-      </SelectField>}
-      <Button disabled={!ready || add.isPending} onClick={() => {
-        setError(undefined);
-        add.mutate({ categoryId: detail.id, subjectId: form.subjectId, boardId: form.boardId || null, levelId: form.levelId || null }, {
-          onSuccess: () => setForm({ subjectId: '', boardId: '', levelId: '' }),
-          onError: (err) => setError(describeApiError(err, 'add offerings').message),
-        });
-      }}>{add.isPending ? 'Adding…' : 'Add offering'}</Button>
-    </div>}
-    {error && <p className="text-xs text-error-foreground" role="alert">{error}</p>}
-  </div>;
+  const title = editing ? 'Edit category' : parent ? 'Add sub-category' : 'Add category';
+  const path = editing
+    ? breadcrumb(nodes, editing).map((n) => n.name)
+    : [...(parent ? breadcrumb(nodes, parent).map((n) => n.name) : []), trimmed || 'New category'];
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!trimmed || pending) return;
+    setError(undefined);
+    try {
+      if (editing) {
+        if (trimmed !== editing.name) await update.mutateAsync({ id: editing.id, version: editing.version, name: trimmed });
+        onSaved(editing.id);
+        return;
+      }
+      const code = uniqueSiblingCode(nodes, parent?.id ?? null, trimmed);
+      const created = await create.mutateAsync({ parentId: parent?.id ?? null, code, name: trimmed });
+      onSaved(created.id);
+    } catch (err) {
+      setError(describeApiError(err, 'change the catalogue').message);
+    }
+  };
+
+  return <Card className="gap-0 py-0">
+    <form onSubmit={(e) => void submit(e)} aria-labelledby="category-form-title">
+      <div className="flex flex-col gap-1 px-5 pt-5 pb-4">
+        <h2 id="category-form-title" className="text-lg font-semibold">{title}</h2>
+        <p className="text-xs text-muted-foreground" aria-label="Path">{path.join(' › ')}</p>
+      </div>
+      <div className="flex flex-col gap-3 px-5 pb-5">
+        <TextField label="Name" required maxLength={100} value={name} autoFocus
+          onChange={(e) => setName(e.target.value)} error={error} />
+      </div>
+      <div className="flex items-center gap-2 border-t px-5 py-4">
+        <Button type="submit" size="sm" disabled={pending || !trimmed}>{pending ? 'Saving…' : 'Save'}</Button>
+        <Button type="button" size="sm" variant="outline" onClick={onCancel} disabled={pending}>
+          <X aria-hidden="true" /> Cancel
+        </Button>
+      </div>
+    </form>
+  </Card>;
 }
