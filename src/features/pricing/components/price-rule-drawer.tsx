@@ -144,7 +144,7 @@ export function PriceRuleDrawer({
           <form id={formId} onSubmit={submit} noValidate aria-busy={pending || undefined} className="flex flex-col gap-4 px-4">
             <TextField label="Tutor" readOnly value={tutorLabel} hint={!rule && !preset ? "Tutor prices are set from the tutor's subject cards above." : undefined} />
             {rule ? (
-              <TextField label="Offering" readOnly value={[rule.categoryName, rule.boardName, rule.subjectName, rule.levelName].filter(Boolean).join(" › ")} />
+              <TextField label="Offering" readOnly value={`${rule.subjectName} · ${rule.pathLabel}`} />
             ) : preset ? (
               <TextField label="Offering" readOnly value={preset.offeringLabel} />
             ) : (

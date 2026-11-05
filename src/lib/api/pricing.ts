@@ -27,8 +27,11 @@ export const priceRuleSchema = z.object({
   facultyName: z.string().nullable(),
   categoryName: z.string(),
   boardName: z.string().nullable(),
+  /** The subject, or the leaf of the category tree ("Class 11") */
   subjectName: z.string(),
-  levelName: z.string(),
+  levelName: z.string().nullable(),
+  /** The category path above it: "Academic › School › K-12 › CBSE › Physics" */
+  pathLabel: z.string(),
   amounts: priceAmountsSchema,
   effectiveFrom: z.string(),
   effectiveTo: z.string().nullable(),
