@@ -40,11 +40,14 @@ export interface ConsentRecord {
 
 export interface AdminStudentDetail extends AdminStudent {
   learningProfile: {
-    category: string;
-    board: string | null;
-    level: string;
-    teachingLanguage: string;
-    subjects: string[];
+    teachingLanguage: string | null;
+    /** One per chosen offering, any mix of branches */
+    interests: {
+      category: string;
+      board: string | null;
+      level: string | null;
+      subject: string;
+    }[];
   };
   consent: ConsentRecord | null;
 }

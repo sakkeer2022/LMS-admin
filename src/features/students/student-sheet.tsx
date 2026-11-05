@@ -121,23 +121,34 @@ export function StudentSheet({
               </dl>
 
               <Section title="Learning profile">
-                <dl className="flex flex-col gap-2">
-                  <Fact label="Category">
-                    {student.learningProfile.category}
-                  </Fact>
-                  {student.learningProfile.board && (
-                    <Fact label="Board">{student.learningProfile.board}</Fact>
-                  )}
-                  <Fact label="Level">{student.learningProfile.level}</Fact>
-                  <Fact label="Teaching language">
-                    {student.learningProfile.teachingLanguage}
-                  </Fact>
-                  <Fact label="Subjects">
-                    {student.learningProfile.subjects.length
-                      ? student.learningProfile.subjects.join(", ")
-                      : "—"}
-                  </Fact>
-                </dl>
+                {student.learningProfile.interests.length ? (
+                  <ul className="flex flex-col gap-2">
+                    {student.learningProfile.interests.map((interest, i) => (
+                      <li
+                        key={i}
+                        className="flex flex-col rounded-md bg-sunken px-3 py-2 text-sm"
+                      >
+                        <span className="text-xs text-text-secondary">
+                          {interest.category}
+                        </span>
+                        <span className="font-medium">
+                          {[interest.subject, interest.level, interest.board]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-text-secondary">None chosen.</p>
+                )}
+                {student.learningProfile.teachingLanguage && (
+                  <dl className="mt-2 flex flex-col gap-2">
+                    <Fact label="Teaching language">
+                      {student.learningProfile.teachingLanguage}
+                    </Fact>
+                  </dl>
+                )}
               </Section>
 
               <Section title="Parent or guardian">
