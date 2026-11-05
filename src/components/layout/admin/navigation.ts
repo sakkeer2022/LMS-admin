@@ -15,12 +15,44 @@ export type AdminNavigationGroup = {
 };
 // Suffixes are appended to the admin base path (/admin).
 export const adminNavigation: AdminNavigationGroup[] = [
-  { label: 'Overview', items: [['Dashboard', '/dashboard', 'dashboard']] },
-  { label: 'People', items: [['Users', '/users', 'users'], ['Faculty', '/faculty', 'faculty']] },
-  { label: 'Catalogue', items: [['Categories & Content', '/categories', 'folder'], ['Pricing', '/pricing', 'money']] },
-  { label: 'Operations', items: [['Bookings', '/bookings', 'calendar'], ['Reviews', '/reviews', 'star'], ['Progress Reports', '/progress', 'file']] },
-  { label: 'Finance', items: [['Reports', '/reports', 'file'], ['Payouts', '/payouts', 'wallet']] },
-  { label: 'Account', items: [['Settings', '/settings', 'settings']] },
+  { label: "Overview", items: [["Dashboard", "/dashboard", "dashboard"]] },
+  {
+    label: "People",
+    items: [
+      ["Users", "/users", "users"],
+      ["Students", "/students", "users"],
+      ["Faculty", "/faculty", "faculty"],
+    ],
+  },
+  {
+    label: "Catalogue",
+    items: [
+      ["Categories & Content", "/categories", "folder"],
+      ["Pricing", "/pricing", "money"],
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      ["Bookings", "/bookings", "calendar"],
+      ["Reviews", "/reviews", "star"],
+      ["Progress Reports", "/progress", "file"],
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      ["Reports", "/reports", "file"],
+      ["Payouts", "/payouts", "wallet"],
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      ["Settings", "/settings", "settings"],
+      ["Legal documents", "/legal", "file"],
+    ],
+  },
 ];
 
 export function isNavigationActive(pathname: string, href: string) {
