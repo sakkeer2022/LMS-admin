@@ -2,11 +2,13 @@ import { z } from "zod";
 import {
   FACULTY_SORTS,
   FACULTY_TABS,
+  type FacultyDetail,
   type FacultyFilters,
   type FacultyListItem,
   type FacultyRowStatus,
   type FacultySort,
   type FacultyTab,
+  type PricingStatus,
 } from "../types/faculty";
 
 // ── Email rule (same expression as the backend, faculty.dto.ts) ──────
@@ -92,17 +94,44 @@ export type InviteRequest = z.infer<typeof inviteRequestSchema>;
 
 // ── Status presentation ─────────────────────────────────────────────
 
-export type BadgeTone = "neutral" | "success" | "danger" | "warning" | "info" | "accent";
+/** Variants of the shadcn Badge (src/components/shadcn/badge.tsx). */
+export type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
 
-export const STATUS_META: Record<FacultyRowStatus, { label: string; tone: BadgeTone }> = {
-  invited: { label: "Invited", tone: "info" },
-  expired: { label: "Invite expired", tone: "neutral" },
-  pending: { label: "Pending", tone: "warning" },
-  verified: { label: "Verified", tone: "success" },
-  published: { label: "Published", tone: "accent" },
-  rejected: { label: "Rejected", tone: "danger" },
-  suspended: { label: "Suspended", tone: "danger" },
+export const STATUS_META: Record<FacultyRowStatus, { label: string; variant: BadgeVariant }> = {
+  invited: { label: "Invited", variant: "info" },
+  expired: { label: "Invite expired", variant: "secondary" },
+  pending: { label: "Pending", variant: "warning" },
+  verified: { label: "Verified", variant: "success" },
+  published: { label: "Published", variant: "default" },
+  rejected: { label: "Rejected", variant: "destructive" },
+  suspended: { label: "Suspended", variant: "destructive" },
 };
+
+/** Pricing after approval (LMS-58/59): shown beside the status; "none" shows nothing. */
+export const PRICING_META: Record<Exclude<PricingStatus, "none">, { label: string; variant: BadgeVariant }> = {
+  awaiting_price: { label: "Price pending", variant: "warning" },
+  awaiting_consent: { label: "Awaiting tutor consent", variant: "info" },
+  accepted: { label: "Prices accepted", variant: "success" },
+  declined: { label: "Price declined", variant: "destructive" },
+};
+
+export function pricingMeta(status: PricingStatus) {
+  return status === "none" ? undefined : PRICING_META[status];
+}
+
+/** "312 KB", "1.2 MB" */
+export function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Whether the drawer can decide: only a pending (or changes requested) application. */
+export function canDecide(detail: Pick<FacultyDetail, "approvalStatus">) {
+  return detail.approvalStatus === "pending" || detail.approvalStatus === "changes_requested";
+}
+
+export const REJECT_REASON_MAX = 1000;
 
 export const TAB_LABELS: Record<FacultyTab, string> = {
   all: "All profiles",

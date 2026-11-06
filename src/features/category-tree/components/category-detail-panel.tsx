@@ -1,55 +1,66 @@
 "use client";
-import { useState, type ReactNode } from 'react';
-import { Plus } from 'lucide-react';
-import { Badge, Button, Card, SelectField, Switch, Typography } from '@/components/ui';
-import { CheckField } from './check-field';
-import { PanelMessage, PanelSkeleton } from '@/components/ui/dashboard-ui';
+import { useState, type FormEvent, type ReactNode } from 'react';
+import { Plus, X } from 'lucide-react';
+import { TextField } from '@/components/forms/field';
+import { PanelMessage } from '@/components/layout/panel-message';
+import { Badge } from '@/components/shadcn/badge';
+import { Button } from '@/components/shadcn/button';
+import { Card } from '@/components/shadcn/card';
+import { Skeleton } from '@/components/shadcn/skeleton';
+import { Switch } from '@/components/shadcn/switch';
 import { describeApiError } from '@/lib/api/errors';
-import {
-  useAddOffering, useCategoryDetail, useLookup, useOfferings, useSetOfferingActive,
-  type CategoryDetail, type CategoryNode,
-} from '@/lib/api/category-tree';
-import { addChildBlockedReason, curriculaLabel } from '@/lib/api/category-tree-model';
+import { useCategoryDetail, useCreateCategory, useUpdateCategory, type CategoryDetail, type CategoryNode } from '@/lib/api/category-tree';
+import { addChildBlockedReason, breadcrumb, uniqueSiblingCode } from '@/lib/api/category-tree-model';
 
 const dateFormat = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'Asia/Kolkata' });
+
+/** What the right column shows: the selected category, or the add / edit form. */
+export type PanelMode =
+  | { kind: 'view' }
+  | { kind: 'edit'; node: CategoryNode }
+  | { kind: 'create'; parent: CategoryNode | null };
 
 interface Actions {
   onAddChild: (node: CategoryNode) => void;
   onEdit: (node: CategoryNode) => void;
   onDelete: (node: CategoryNode) => void;
   onToggleActive: (node: CategoryNode, isActive: boolean) => void;
-  onError: (error: unknown, action: string) => void;
+}
+
+export function Rows({ count }: { count: number }) {
+  return <div className="flex flex-col gap-2" role="status" aria-label="Loading">
+    {Array.from({ length: count }, (_, i) => <Skeleton key={i} className="h-5 w-full" />)}
+  </div>;
 }
 
 /** Detail card for the selected category (screen 28, right column). */
-export function CategoryDetailPanel({ tenant, node, canManage, pending, ...actions }: Actions & {
-  tenant: string;
+export function CategoryDetailPanel({ node, canManage, pending, ...actions }: Actions & {
   node: CategoryNode | undefined;
   canManage: boolean;
   pending: boolean;
 }) {
-  const detail = useCategoryDetail(tenant, node?.id);
-  if (!node) return <Card className="p-5"><Typography tone="muted">Select a category to see its details.</Typography></Card>;
-  if (detail.isPending) return <Card className="p-5"><PanelSkeleton rows={5} /></Card>;
+  const detail = useCategoryDetail(node?.id);
+  if (!node) return <Card className="p-5"><p className="text-sm text-muted-foreground">Select a category to see its details.</p></Card>;
+  if (detail.isPending) return <Card className="p-5"><Rows count={5} /></Card>;
   if (detail.isError || !detail.data) {
     return <Card className="p-5"><PanelMessage onRetry={() => void detail.refetch()}>The category could not be loaded. {describeApiError(detail.error, 'view the catalogue').message}</PanelMessage></Card>;
   }
-  return <CategoryDetailView tenant={tenant} detail={detail.data} node={node} canManage={canManage} pending={pending} {...actions} />;
+  return <CategoryDetailView detail={detail.data} node={node} canManage={canManage} pending={pending} {...actions} />;
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return <div className="flex items-center justify-between gap-3">
-    <Typography variant="body2" tone="muted" component="dt">{label}</Typography>
-    <dd className="m-0 text-right">{children}</dd>
+    <dt className="text-sm text-muted-foreground">{label}</dt>
+    <dd className="m-0 text-right text-sm">{children}</dd>
   </div>;
 }
 
 /**
- * Same entity and the same actions as the tree row: the Active switch, Edit and Delete.
- * The tree's cached node drives the switch, so a change in either place shows in both.
+ * Same entity and the same actions as the selected tree row: the Active switch, Edit and
+ * Delete, plus Add sub-category. The tree's cached node drives the switch, so a change
+ * in either place shows in both.
  */
-export function CategoryDetailView({ tenant, detail, node, canManage, pending, onAddChild, onEdit, onDelete, onToggleActive, onError }: Actions & {
-  tenant: string;
+export function CategoryDetailView({ detail, node, canManage, pending, onAddChild, onEdit, onDelete, onToggleActive }: Actions & {
   detail: CategoryDetail;
   node: CategoryNode;
   canManage: boolean;
@@ -57,118 +68,111 @@ export function CategoryDetailView({ tenant, detail, node, canManage, pending, o
 }) {
   const blocked = addChildBlockedReason(node);
   const isLeaf = node.childrenCount === 0;
-  const showCurricula = node.isBookable;
 
-  return <Card style={{ padding: 0 }} className="flex flex-col">
+  return <Card className="gap-0 py-0">
     <div className="flex flex-col gap-4 p-5">
       <div className="flex flex-col gap-1">
         <div className="flex items-start justify-between gap-3">
-          <Typography variant="h3" component="h2" className="min-w-0 break-words">{node.name}</Typography>
-          {canManage && <Switch checked={node.isActive} disabled={pending} label={`${node.isActive ? 'Deactivate' : 'Activate'} ${node.name}`}
+          <h2 className="min-w-0 text-lg font-semibold break-words">{node.name}</h2>
+          {canManage && <Switch checked={node.isActive} disabled={pending} aria-label={`${node.isActive ? 'Disable' : 'Enable'} ${node.name}`}
             onCheckedChange={(value) => onToggleActive(node, value)} />}
         </div>
-        <Typography variant="caption" tone="muted" component="p" aria-label="Path">
+        <p className="text-xs text-muted-foreground" aria-label="Path">
           {[...detail.breadcrumb.map((b) => b.name), node.name].join(' › ')}
-        </Typography>
+        </p>
       </div>
       <dl className="m-0 flex flex-col gap-3">
         <Row label="Status">
-          <Badge tone={node.isActive ? 'success' : 'warning'} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span aria-hidden="true" className="inline-block h-1.5 w-1.5 rounded-full bg-current" />
+          <Badge variant={node.isActive ? 'success' : 'warning'}>
+            <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-current" />
             {node.isActive ? 'Active' : 'Inactive'}
           </Badge>
         </Row>
-        <Row label="Created">
-          <Typography variant="subtitle2" component="span">{dateFormat.format(new Date(detail.createdAt))}</Typography>
-        </Row>
+        <Row label="Created"><span className="font-semibold">{dateFormat.format(new Date(detail.createdAt))}</span></Row>
       </dl>
-      {!node.isActive && <Typography variant="caption" tone="muted" component="p">Hidden from learners, with everything below it.</Typography>}
+      {!node.isActive && <p className="text-xs text-muted-foreground">Hidden from tutors and learners, with everything below it.</p>}
     </div>
 
-    <div className="flex flex-col gap-4 border-t border-[var(--border)] p-5">
-      <div className="flex flex-col gap-1 rounded-[var(--radius)] border border-[var(--border)] px-4 py-4">
-        <Typography variant="h1" component="p" className="tabular-nums">
-          {(showCurricula ? node.curriculaCount : node.childrenCount).toLocaleString('en-IN')}
-        </Typography>
-        <Typography variant="caption" tone="muted">{showCurricula ? 'Curricula' : 'Sub category count'}</Typography>
+    <div className="flex flex-col gap-4 border-t p-5">
+      <div className="flex flex-col gap-1 rounded-md border px-4 py-4">
+        <p className="text-2xl font-bold tabular-nums">
+          {(isLeaf ? node.tutorCount : node.childrenCount).toLocaleString('en-IN')}
+        </p>
+        <span className="text-xs text-muted-foreground">{isLeaf ? 'Tutor count' : 'Sub category count'}</span>
       </div>
 
       {canManage && <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={() => onAddChild(node)} disabled={Boolean(blocked)} title={blocked ?? undefined}
-          aria-describedby={blocked ? `add-blocked-${node.id}` : undefined} className="inline-flex items-center gap-1">
-          <Plus size={14} aria-hidden="true" /> Add sub-category
+        <Button size="sm" variant="outline" onClick={() => onAddChild(node)} disabled={Boolean(blocked)} title={blocked ?? undefined}
+          aria-describedby={blocked ? `add-blocked-${node.id}` : undefined}>
+          <Plus aria-hidden="true" /> Add sub-category
         </Button>
-        <Button size="sm" onClick={() => onEdit(node)} disabled={pending}>Edit</Button>
-        <Button size="sm" variant="ghost" onClick={() => onDelete(node)} disabled={pending} style={{ color: 'var(--warning)' }}>Delete</Button>
+        <Button size="sm" variant="outline" onClick={() => onEdit(node)} disabled={pending}>Edit</Button>
+        <Button size="sm" variant="ghost" onClick={() => onDelete(node)} disabled={pending} className="text-warning-foreground">Delete</Button>
       </div>}
-      {canManage && blocked && <Typography id={`add-blocked-${node.id}`} variant="caption" tone="muted" component="p">{blocked}</Typography>}
+      {canManage && blocked && <p id={`add-blocked-${node.id}`} className="text-xs text-muted-foreground">{blocked}</p>}
     </div>
-
-    {isLeaf && (node.isBookable || detail.requiresLevel) && <div className="flex flex-col gap-3 border-t border-[var(--border)] p-5">
-      <Typography variant="subtitle2" component="h3">Booking</Typography>
-      <dl className="m-0 flex flex-col gap-2">
-        <Row label="Bookable"><Typography variant="body2" component="span">{node.isBookable ? 'Yes' : 'No'}</Typography></Row>
-        {node.isBookable && <Row label="Learner chooses">
-          <Typography variant="body2" component="span">{[detail.requiresBoard && 'board', detail.requiresLevel && 'level', 'subject'].filter(Boolean).join(', ')}</Typography>
-        </Row>}
-      </dl>
-      {detail.requiresLevel && <div className="flex flex-col gap-1">
-        <Typography variant="caption" tone="muted" component="p">Allowed levels</Typography>
-        <div className="flex flex-wrap gap-1">
-          {detail.allowedLevels.length ? detail.allowedLevels.map((l) => <Badge key={l.id} tone={l.isActive ? 'neutral' : 'warning'}>{l.name}</Badge>)
-            : <Typography variant="body2" tone="muted">None yet. Choose levels in Edit.</Typography>}
-        </div>
-      </div>}
-      {node.isBookable && <OfferingsSection tenant={tenant} detail={detail} canManage={canManage} onError={onError} />}
-    </div>}
   </Card>;
 }
 
-/** The leaf's offerings: each is a subject with an optional board and level (a curriculum). */
-function OfferingsSection({ tenant, detail, canManage, onError }: { tenant: string; detail: CategoryDetail; canManage: boolean; onError: Actions['onError'] }) {
-  const offerings = useOfferings(tenant, detail.id);
-  const subjects = useLookup(tenant, 'subjects', canManage);
-  const boards = useLookup(tenant, 'boards', canManage && detail.requiresBoard);
-  const add = useAddOffering(tenant);
-  const toggle = useSetOfferingActive(tenant);
-  const [form, setForm] = useState({ subjectId: '', boardId: '', levelId: '' });
+/**
+ * "Edit category" (as in the design) and the same form for adding a category or a
+ * sub-category: the name is the only field. The code in the path is made from the name
+ * when the category is created and is not changed by a rename.
+ */
+export function CategoryForm({ mode, nodes, onCancel, onSaved }: {
+  mode: Exclude<PanelMode, { kind: 'view' }>;
+  nodes: readonly CategoryNode[];
+  onCancel: () => void;
+  onSaved: (id: string) => void;
+}) {
+  const create = useCreateCategory();
+  const update = useUpdateCategory();
+  const editing = mode.kind === 'edit' ? mode.node : undefined;
+  const parent = mode.kind === 'create' ? mode.parent : null;
+  const [name, setName] = useState(editing?.name ?? '');
   const [error, setError] = useState<string>();
-  const ready = form.subjectId && (!detail.requiresBoard || form.boardId) && (!detail.requiresLevel || form.levelId);
+  const pending = create.isPending || update.isPending;
+  const trimmed = name.trim();
 
-  return <div className="flex flex-col gap-2">
-    <Typography variant="subtitle2" component="h3">Offerings ({offerings.data ? curriculaLabel(offerings.data.length) : '…'})</Typography>
-    {offerings.isPending ? <PanelSkeleton rows={2} />
-      : offerings.isError ? <PanelMessage onRetry={() => void offerings.refetch()}>Offerings could not be loaded.</PanelMessage>
-      : offerings.data.length === 0 ? <Typography variant="body2" tone="muted">No offerings yet, so learners cannot book this category.</Typography>
-      : <ul className="flex flex-col gap-1">
-          {offerings.data.map((o) => <li key={o.curriculumId} className="flex items-center justify-between gap-2">
-            <Typography variant="body2" component="span">{[o.board?.name, o.subject.name, o.level?.name].filter(Boolean).join(' · ')}</Typography>
-            {canManage ? <CheckField label="Active" aria-label={`Active: ${[o.board?.name, o.subject.name, o.level?.name].filter(Boolean).join(' · ')}`} checked={o.isActive}
-              onChange={(e) => toggle.mutate({ curriculumId: o.curriculumId, isActive: e.target.checked }, { onError: (err) => onError(err, 'change the offering') })} />
-              : !o.isActive && <Badge tone="warning">Inactive</Badge>}
-          </li>)}
-        </ul>}
-    {canManage && <div className="flex flex-wrap items-end gap-2">
-      <SelectField label="Subject" value={form.subjectId} onChange={(e) => setForm({ ...form, subjectId: e.target.value })}>
-        <option value="">Choose…</option>
-        {subjects.data?.filter((s) => s.isActive).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </SelectField>
-      {detail.requiresBoard && <SelectField label="Board" value={form.boardId} onChange={(e) => setForm({ ...form, boardId: e.target.value })}>
-        <option value="">Choose…</option>
-        {boards.data?.filter((b) => b.isActive).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-      </SelectField>}
-      {detail.requiresLevel && <SelectField label="Level" value={form.levelId} onChange={(e) => setForm({ ...form, levelId: e.target.value })}>
-        <option value="">Choose…</option>
-        {detail.allowedLevels.filter((l) => l.isActive).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-      </SelectField>}
-      <Button size="sm" variant="primary" disabled={!ready} pending={add.isPending} onClick={() => {
-        setError(undefined);
-        add.mutate({ categoryId: detail.id, subjectId: form.subjectId, boardId: form.boardId || null, levelId: form.levelId || null }, {
-          onSuccess: () => setForm({ subjectId: '', boardId: '', levelId: '' }),
-          onError: (err) => setError(describeApiError(err, 'add offerings').message),
-        });
-      }}>Add offering</Button>
-    </div>}
-    {error && <Typography variant="caption" tone="danger" role="alert">{error}</Typography>}
-  </div>;
+  const title = editing ? 'Edit category' : parent ? 'Add sub-category' : 'Add category';
+  const path = editing
+    ? breadcrumb(nodes, editing).map((n) => n.name)
+    : [...(parent ? breadcrumb(nodes, parent).map((n) => n.name) : []), trimmed || 'New category'];
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!trimmed || pending) return;
+    setError(undefined);
+    try {
+      if (editing) {
+        if (trimmed !== editing.name) await update.mutateAsync({ id: editing.id, version: editing.version, name: trimmed });
+        onSaved(editing.id);
+        return;
+      }
+      const code = uniqueSiblingCode(nodes, parent?.id ?? null, trimmed);
+      const created = await create.mutateAsync({ parentId: parent?.id ?? null, code, name: trimmed });
+      onSaved(created.id);
+    } catch (err) {
+      setError(describeApiError(err, 'change the catalogue').message);
+    }
+  };
+
+  return <Card className="gap-0 py-0">
+    <form onSubmit={(e) => void submit(e)} aria-labelledby="category-form-title">
+      <div className="flex flex-col gap-1 px-5 pt-5 pb-4">
+        <h2 id="category-form-title" className="text-lg font-semibold">{title}</h2>
+        <p className="text-xs text-muted-foreground" aria-label="Path">{path.join(' › ')}</p>
+      </div>
+      <div className="flex flex-col gap-3 px-5 pb-5">
+        <TextField label="Name" required maxLength={100} value={name} autoFocus
+          onChange={(e) => setName(e.target.value)} error={error} />
+      </div>
+      <div className="flex items-center gap-2 border-t px-5 py-4">
+        <Button type="submit" size="sm" disabled={pending || !trimmed}>{pending ? 'Saving…' : 'Save'}</Button>
+        <Button type="button" size="sm" variant="outline" onClick={onCancel} disabled={pending}>
+          <X aria-hidden="true" /> Cancel
+        </Button>
+      </div>
+    </form>
+  </Card>;
 }

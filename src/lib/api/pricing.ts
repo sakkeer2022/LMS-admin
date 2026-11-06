@@ -2,7 +2,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { api, queryString } from './client';
-import { catalogueKeys } from './catalogue';
 import type { PaginationMeta } from './contracts';
 
 // Contract: amentorz-backend src/modules/pricing (pricing.routes.ts, pricing.dto.ts,
@@ -28,8 +27,11 @@ export const priceRuleSchema = z.object({
   facultyName: z.string().nullable(),
   categoryName: z.string(),
   boardName: z.string().nullable(),
+  /** The subject, or the leaf of the category tree ("Class 11") */
   subjectName: z.string(),
-  levelName: z.string(),
+  levelName: z.string().nullable(),
+  /** The category path above it: "Academic › School › K-12 › CBSE › Physics" */
+  pathLabel: z.string(),
   amounts: priceAmountsSchema,
   effectiveFrom: z.string(),
   effectiveTo: z.string().nullable(),
@@ -91,22 +93,29 @@ export interface BulkPriceChange {
   sessionPricePaise: number;
   expectedRevision: number;
 }
+/** First tutor price for a subject card awaiting one (active from now, no end date). */
+export interface BulkPriceCreate {
+  curriculumId: string;
+  facultyId: string;
+  sessionPricePaise: number;
+}
 
 export const pricingKeys = {
-  all: (tenant: string) => ['pricing', tenant] as const,
-  rules: (tenant: string) => ['pricing', tenant, 'rules'] as const,
-  list: (tenant: string, filters: PriceRuleFilters) => ['pricing', tenant, 'rules', filters] as const,
-  resolve: (tenant: string, curriculumId: string, facultyId: string) => ['pricing', tenant, 'resolve', curriculumId, facultyId] as const,
-  quote: (tenant: string, items: QuoteRequestItem[]) => ['pricing', tenant, 'quote', items] as const,
+  all: () => ['pricing'] as const,
+  rules: () => ['pricing', 'rules'] as const,
+  list: (filters: PriceRuleFilters) => ['pricing', 'rules', filters] as const,
+  resolve: (curriculumId: string, facultyId: string) => ['pricing', 'resolve', curriculumId, facultyId] as const,
+  quote: (items: QuoteRequestItem[]) => ['pricing', 'quote', items] as const,
+  awaiting: () => ['pricing', 'awaiting'] as const,
 };
 
 function listQuery({ page, limit, isActive, q, categoryId, subjectId, facultyId }: PriceRuleFilters) {
   return queryString({ page: String(page), limit: String(limit), q, categoryId, subjectId, facultyId, isActive: isActive === undefined ? undefined : String(isActive) });
 }
 
-export function usePriceRules(tenant: string, filters: PriceRuleFilters, enabled = true) {
+export function usePriceRules(filters: PriceRuleFilters, enabled = true) {
   return useQuery({
-    queryKey: pricingKeys.list(tenant, filters),
+    queryKey: pricingKeys.list(filters),
     enabled,
     placeholderData: keepPreviousData,
     queryFn: async ({ signal }): Promise<{ rules: PriceRule[]; meta?: PaginationMeta }> => {
@@ -116,43 +125,45 @@ export function usePriceRules(tenant: string, filters: PriceRuleFilters, enabled
   });
 }
 
-function usePricingMutation<V, R>(tenant: string, fn: (input: V) => Promise<R>) {
+function usePricingMutation<V, R>(fn: (input: V) => Promise<R>) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: fn,
     meta: { inlineErrors: true },
     onSuccess: () =>
       Promise.all([
-        client.invalidateQueries({ queryKey: pricingKeys.all(tenant) }),
-        // The catalogue detail panel shows each leaf's default price
-        client.invalidateQueries({ queryKey: catalogueKeys.nodes(tenant) }),
+        client.invalidateQueries({ queryKey: pricingKeys.all() }),
+        // The faculty list and drawer show each tutor's pricing state
+        client.invalidateQueries({ queryKey: ['faculty'] }),
+        // The category detail panel shows each leaf's default price
+        client.invalidateQueries({ queryKey: ['category-tree'] }),
       ]),
   });
 }
 const send = (method: 'POST' | 'PUT', body: unknown) => ({ method, body: JSON.stringify(body) });
 
-export function useCreatePriceRule(tenant: string) {
-  return usePricingMutation(tenant, async (input: CreatePriceRuleInput) =>
+export function useCreatePriceRule() {
+  return usePricingMutation(async (input: CreatePriceRuleInput) =>
     priceRuleSchema.parse((await api<unknown>('/admin/prices', send('POST', input))).data));
 }
-export function useUpdatePriceRule(tenant: string) {
-  return usePricingMutation(tenant, async ({ id, ...input }: UpdatePriceRuleInput) =>
+export function useUpdatePriceRule() {
+  return usePricingMutation(async ({ id, ...input }: UpdatePriceRuleInput) =>
     priceRuleSchema.parse((await api<unknown>(`/admin/prices/${encodeURIComponent(id)}`, send('PUT', input))).data));
 }
 /** Deactivating is an update with isActive false; there is no separate endpoint. */
-export function useDeactivatePriceRule(tenant: string) {
-  const update = useUpdatePriceRule(tenant);
+export function useDeactivatePriceRule() {
+  const update = useUpdatePriceRule();
   return { ...update, mutateAsync: (rule: Pick<PriceRule, 'id' | 'revision'>) => update.mutateAsync({ id: rule.id, expectedRevision: rule.revision, isActive: false }) };
 }
-/** All or nothing: a 409 lists the rejected rows as errors["changes[i]"]. */
-export function useBulkUpdatePrices(tenant: string) {
-  return usePricingMutation(tenant, async (changes: BulkPriceChange[]) =>
-    z.array(priceRuleSchema).parse((await api<unknown>('/admin/prices/bulk', send('PUT', { changes }))).data));
+/** All or nothing: a 409 lists the rejected rows as errors["changes[i]"] / errors["creates[i]"]. */
+export function useBulkUpdatePrices() {
+  return usePricingMutation(async (body: { changes: BulkPriceChange[]; creates: BulkPriceCreate[] }) =>
+    z.array(priceRuleSchema).parse((await api<unknown>('/admin/prices/bulk', send('PUT', body))).data));
 }
 
-export function useResolvePrice(tenant: string, params: { curriculumId?: string; facultyId?: string }) {
+export function useResolvePrice(params: { curriculumId?: string; facultyId?: string }) {
   return useQuery({
-    queryKey: pricingKeys.resolve(tenant, params.curriculumId ?? '', params.facultyId ?? ''),
+    queryKey: pricingKeys.resolve(params.curriculumId ?? '', params.facultyId ?? ''),
     enabled: Boolean(params.curriculumId),
     queryFn: async ({ signal }) => {
       const query = queryString({ curriculumId: params.curriculumId, facultyId: params.facultyId });
@@ -161,10 +172,35 @@ export function useResolvePrice(tenant: string, params: { curriculumId?: string;
   });
 }
 /** Price ranges for the faculty registration screens (F4); POST, so it carries the CSRF token. */
-export function usePriceQuote(tenant: string, items: QuoteRequestItem[]) {
+export function usePriceQuote(items: QuoteRequestItem[]) {
   return useQuery({
-    queryKey: pricingKeys.quote(tenant, items),
+    queryKey: pricingKeys.quote(items),
     enabled: items.length > 0,
     queryFn: async () => z.array(quoteItemSchema).parse((await api<unknown>('/prices/quote', send('POST', { items }))).data),
+  });
+}
+
+/** GET /admin/prices/awaiting: approved tutors' subject cards with no active tutor price yet. */
+export const awaitingPriceSchema = z.object({
+  facultyId: z.string(),
+  facultyName: z.string(),
+  facultyEmail: z.string(),
+  approvedAt: z.string().nullable(),
+  curriculumId: z.string(),
+  subject: z.string(),
+  pathLabel: z.string(),
+  categoryPath: z.array(z.string()),
+  board: z.string().nullable(),
+  level: z.string().nullable(),
+  defaultPrice: priceAmountsSchema.nullable(),
+});
+export type AwaitingPrice = z.infer<typeof awaitingPriceSchema>;
+
+export function useAwaitingPrices(enabled = true) {
+  return useQuery({
+    queryKey: pricingKeys.awaiting(),
+    enabled,
+    queryFn: async ({ signal }) =>
+      z.array(awaitingPriceSchema).parse((await api<unknown>('/admin/prices/awaiting', { signal })).data),
   });
 }

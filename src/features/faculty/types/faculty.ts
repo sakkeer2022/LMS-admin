@@ -31,6 +31,7 @@ export const facultyListItemSchema = z.object({
   subjects: z.array(z.string()),
   qualification: z.string().nullable(),
   documents: z.object({ uploaded: z.number(), required: z.number() }).nullable(),
+  pricing: z.enum(["none", "awaiting_price", "awaiting_consent", "accepted", "declined"]),
   appliedAt: z.string(),
   invitation: z
     .object({
@@ -77,3 +78,67 @@ export interface FacultyFilters {
 }
 
 export type FacultyRowAction = "view" | "edit" | "suspend" | "delete" | "resend" | "revoke";
+
+export const PRICING_STATUSES = ["none", "awaiting_price", "awaiting_consent", "accepted", "declined"] as const;
+export type PricingStatus = (typeof PRICING_STATUSES)[number];
+
+// Contract: getFacultyAdmin (GET /admin/faculty/{facultyId}), screen 27b.
+export const facultyDocumentSchema = z.object({
+  id: z.string(),
+  type: z.enum(["GOVERNMENT_ID", "DEGREE_CERTIFICATE", "PAN_CARD", "EXPERIENCE_LETTER", "BACKGROUND_CHECK", "OTHER"]),
+  label: z.string(),
+  fileName: z.string(),
+  mimeType: z.string(),
+  fileSize: z.number(),
+  uploadedAt: z.string(),
+  isVerified: z.boolean(),
+  verifiedAt: z.string().nullable(),
+  scanStatus: z.enum(["pending", "clean", "infected", "failed"]),
+  previewable: z.boolean(),
+});
+export type FacultyDocument = z.infer<typeof facultyDocumentSchema>;
+
+export const facultyDetailSchema = z.object({
+  id: z.string(),
+  fullName: z.string(),
+  email: z.string(),
+  mobileNumber: z.string().nullable(),
+  city: z.string().nullable(),
+  applicationReference: z.string().nullable(),
+  appliedAt: z.string(),
+  submittedAt: z.string().nullable(),
+  status: z.enum(FACULTY_ROW_STATUSES),
+  approvalStatus: z.enum(["pending", "approved", "rejected", "changes_requested"]),
+  isPublished: z.boolean(),
+  isActive: z.boolean(),
+  revision: z.number(),
+  rejectionReason: z.string().nullable(),
+  approvedAt: z.string().nullable(),
+  screening: z.object({
+    highestQualification: z.string().nullable(),
+    studiedAt: z.string().nullable(),
+    teachingExperience: z.object({ code: z.string(), label: z.string() }).nullable(),
+    offersOfflineClasses: z.boolean(),
+  }),
+  documents: z.array(facultyDocumentSchema),
+  subjects: z.array(
+    z.object({
+      assignmentId: z.string(),
+      curriculumId: z.string(),
+      subject: z.string(),
+      pathLabel: z.string(),
+      sessionPricePaise: z.number().nullable(),
+      studentPaysPaise: z.number().nullable(),
+    }),
+  ),
+  pricing: z.enum(PRICING_STATUSES),
+  consentDecidedAt: z.string().nullable(),
+});
+export type FacultyDetail = z.infer<typeof facultyDetailSchema>;
+
+export interface ReviewInput {
+  decision: "approve" | "reject";
+  reason?: string;
+  publish: boolean;
+  expectedRevision: number;
+}

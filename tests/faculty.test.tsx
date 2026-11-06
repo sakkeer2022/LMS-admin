@@ -18,19 +18,29 @@ import {
   subjectsLabel,
   tutorDetail,
 } from "../src/features/faculty/schemas/faculty";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { DataTable } from "../src/components/data-table/data-table";
+import { PermissionProvider } from "../src/components/security/permission-provider";
 import {
   FACULTY_TABLE_HEADERS,
-  FacultyRow,
   FacultyStatusBadge,
+  PricingBadge,
+  facultyColumns,
   rowActions,
 } from "../src/features/faculty/components/faculty-table";
+import { ReviewView } from "../src/features/faculty/components/faculty-review-drawer";
+import { Sheet } from "../src/components/shadcn/sheet";
+import { canDecide, formatFileSize, pricingMeta } from "../src/features/faculty/schemas/faculty";
 import { FacultyStatusTabs } from "../src/features/faculty/components/faculty-status-tabs";
 import { emptyMessage } from "../src/features/faculty/components/faculty-page";
 import { flaggedEmails, serverEmailMessages } from "../src/features/faculty/components/invite-tutors-modal";
 import { ApiError } from "../src/lib/api/contracts";
 import {
   FACULTY_ROW_STATUSES,
+  facultyDetailSchema,
   facultyListItemSchema,
+  type FacultyDetail,
   inviteResultSchema,
   type FacultyListItem,
 } from "../src/features/faculty/types/faculty";
@@ -46,6 +56,7 @@ const profile: FacultyListItem = {
   subjects: ["Physics", "Chemistry"],
   qualification: "Ph.D. · IIT Bombay",
   documents: { uploaded: 4, required: 4 },
+  pricing: "none",
   appliedAt: "2026-08-28T09:00:00Z",
   invitation: null,
 };
@@ -59,6 +70,7 @@ const invitation: FacultyListItem = {
   subjects: [],
   qualification: null,
   documents: null,
+  pricing: "none",
   appliedAt: "2026-11-02T09:00:00Z",
   invitation: { sentAt: "2026-11-02T09:00:01Z", expiresAt: "2026-11-05T09:00:00Z", deliveryMethod: "email" },
 };
@@ -202,12 +214,26 @@ describe("row presentation", () => {
     expect(rangeLabel(1, 0)).toBe("Showing 0–0 of 0 tutors");
     expect(rangeLabel(1, 1)).toBe("Showing 1–1 of 1 tutor");
   });
-  it("has a label and tone for every status, matching the design colours", () => {
+  it("has a label and badge variant for every status, matching the design colours", () => {
     for (const status of FACULTY_ROW_STATUSES) expect(STATUS_META[status].label).toBeTruthy();
-    expect(STATUS_META.pending.tone).toBe("warning");
-    expect(STATUS_META.verified.tone).toBe("success");
-    expect(STATUS_META.published.tone).toBe("accent");
-    expect(STATUS_META.suspended.tone).toBe("danger");
+    expect(STATUS_META.pending.variant).toBe("warning");
+    expect(STATUS_META.verified.variant).toBe("success");
+    expect(STATUS_META.published.variant).toBe("default");
+    expect(STATUS_META.suspended.variant).toBe("destructive");
+  });
+  it("labels the pricing state after approval, and nothing before", () => {
+    expect(pricingMeta("none")).toBeUndefined();
+    expect(pricingMeta("awaiting_price")?.label).toBe("Price pending");
+    expect(pricingMeta("declined")?.variant).toBe("destructive");
+  });
+  it("formats file sizes and knows when a decision is allowed", () => {
+    expect(formatFileSize(900)).toBe("900 B");
+    expect(formatFileSize(312 * 1024)).toBe("312 KB");
+    expect(formatFileSize(1.25 * 1024 * 1024)).toBe("1.3 MB");
+    expect(canDecide({ approvalStatus: "pending" })).toBe(true);
+    expect(canDecide({ approvalStatus: "changes_requested" })).toBe(true);
+    expect(canDecide({ approvalStatus: "approved" })).toBe(false);
+    expect(canDecide({ approvalStatus: "rejected" })).toBe(false);
   });
   it("explains empty results", () => {
     expect(emptyMessage({ tab: "all", sort: "recent", page: 1 })).toBe("No tutors yet. Invite a tutor to start onboarding.");
@@ -223,7 +249,8 @@ describe("row actions", () => {
   it("offers view, edit, suspend and delete for profiles and calls the handler", () => {
     const onAction = vi.fn();
     const items = rowActions(profile, onAction);
-    expect(items.map((i) => i.label)).toEqual(["View profile", "Edit", "Suspend", "Delete"]);
+    expect(items.map((i) => i.label)).toEqual(["Review application", "Edit", "Suspend", "Delete"]);
+    expect(rowActions({ ...profile, status: "verified" }, onAction)[0]!.label).toBe("View profile");
     expect(items.find((i) => i.id === "delete")?.destructive).toBe(true);
     items[2]!.onSelect();
     expect(onAction).toHaveBeenCalledWith("suspend", profile);
@@ -239,65 +266,144 @@ describe("row actions", () => {
   });
 });
 
+const table = (rows: FacultyListItem[]) =>
+  renderToStaticMarkup(<DataTable caption="Faculty" columns={facultyColumns(vi.fn(), NOW)} data={rows} />);
+
 describe("rendering", () => {
   it("renders a profile row with every column and an accessible action menu", () => {
-    const html = renderToStaticMarkup(
-      <table>
-        <tbody>
-          <FacultyRow row={profile} onAction={vi.fn()} now={NOW} />
-        </tbody>
-      </table>,
-    );
+    const html = table([profile]);
     for (const text of ["Anjali Deshpande", "anjali.deshpande@gmail.com", "Physics · Chemistry", "Ph.D. · IIT Bombay", "4 of 4", "28 Aug", "Pending"])
       expect(html).toContain(text);
     expect(html).toContain('aria-label="Actions for Anjali Deshpande"');
     expect(html).toContain('aria-haspopup="menu"');
-    expect(html).toContain("ui-badge--warning");
+    expect(html).toContain('data-variant="warning"');
   });
   it("renders an invitation row by email", () => {
-    const html = renderToStaticMarkup(
-      <table>
-        <tbody>
-          <FacultyRow row={invitation} onAction={vi.fn()} now={NOW} />
-        </tbody>
-      </table>,
-    );
+    const html = table([invitation]);
     expect(html).toContain("ananya.iyer@gmail.com");
     expect(html).toContain("Invitation sent · expires 5 Nov");
     expect(html).toContain("Invited");
   });
+  it("shows the pricing badge beside the status once approved", () => {
+    const html = table([{ ...profile, status: "verified", pricing: "awaiting_price" }]);
+    expect(html).toContain("Price pending");
+  });
   it("uses the design's column order", () => {
     expect(FACULTY_TABLE_HEADERS).toEqual(["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Status", ""]);
+    const html = table([profile]);
+    const headers = [...html.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => m[1]!.replace(/<[^>]+>/g, ""));
+    expect(headers).toEqual(["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Status", "Actions"]);
   });
   it.each([
-    ["verified", "ui-badge--success", "Verified"],
-    ["published", "ui-badge--accent", "Published"],
-    ["suspended", "ui-badge--danger", "Suspended"],
-  ] as const)("renders the %s badge", (status, tone, label) => {
+    ["verified", "success", "Verified"],
+    ["published", "default", "Published"],
+    ["suspended", "destructive", "Suspended"],
+  ] as const)("renders the %s badge", (status, variant, label) => {
     const html = renderToStaticMarkup(<FacultyStatusBadge status={status} />);
-    expect(html).toContain(tone);
+    expect(html).toContain(`data-variant="${variant}"`);
     expect(html).toContain(label);
+  });
+  it("renders no pricing badge before approval", () => {
+    expect(renderToStaticMarkup(<PricingBadge status="none" />)).toBe("");
   });
   it("renders All first and every tab with its count as an accessible tablist", () => {
     const html = renderToStaticMarkup(
       <FacultyStatusTabs
         value="pending"
         counts={{ all: 118, pending: 7, verified: 12, published: 96, suspended: 3 }}
-        panelId="panel"
         onChange={vi.fn()}
-      />,
+      >
+        queue
+      </FacultyStatusTabs>,
     );
     expect(html).toContain('role="tablist"');
-    const labels = [...html.matchAll(/data-tab="([a-z]+)"/g)].map((m) => m[1]);
-    expect(labels).toEqual(["all", "pending", "verified", "published", "suspended"]);
-    expect(html).toMatch(/aria-selected="true"[^>]*data-tab="pending"|data-tab="pending"[^>]*aria-selected="true"/);
+    const labels = [...html.matchAll(/role="tab"[^>]*>([A-Za-z ]+)</g)].map((m) => m[1]);
+    expect(labels).toEqual(["All profiles", "Pending", "Verified", "Published", "Suspended"]);
+    expect(html).toMatch(/aria-selected="true"[^>]*>Pending/);
     for (const n of ["118", "7", "12", "96", "3"]) expect(html).toContain(`>${n}</span>`);
-    expect(html).toContain("All profiles");
-    expect(html).toContain('aria-controls="panel"');
+    expect(html).toContain('role="tabpanel"');
+    expect(html).toContain("queue");
   });
   it("shows a placeholder while counts load", () => {
-    const html = renderToStaticMarkup(<FacultyStatusTabs value="all" counts={undefined} panelId="p" onChange={vi.fn()} />);
+    const html = renderToStaticMarkup(<FacultyStatusTabs value="all" counts={undefined} onChange={vi.fn()} />);
     expect(html).toContain("Loading count");
+  });
+});
+
+const detail: FacultyDetail = {
+  id: "f1",
+  fullName: "Anil Verma",
+  email: "anil.verma@example.com",
+  mobileNumber: "+919876543210",
+  city: "Pune",
+  applicationReference: "AMZ-T-1001",
+  appliedAt: "2026-11-04T09:00:00Z",
+  submittedAt: "2026-11-04T09:00:00Z",
+  status: "pending",
+  approvalStatus: "pending",
+  isPublished: false,
+  isActive: true,
+  revision: 1,
+  rejectionReason: null,
+  approvedAt: null,
+  screening: {
+    highestQualification: "M.Sc. Physics",
+    studiedAt: "University of Pune",
+    teachingExperience: { code: "3-5", label: "3–5 years" },
+    offersOfflineClasses: true,
+  },
+  documents: [
+    { id: "d1", type: "GOVERNMENT_ID", label: "Photo ID", fileName: "id.pdf", mimeType: "application/pdf", fileSize: 2048, uploadedAt: "2026-11-04T09:00:00Z", isVerified: false, verifiedAt: null, scanStatus: "pending", previewable: true },
+    { id: "d2", type: "PAN_CARD", label: "PAN card", fileName: "pan.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", fileSize: 4096, uploadedAt: "2026-11-04T09:00:00Z", isVerified: true, verifiedAt: "2026-11-04T10:00:00Z", scanStatus: "pending", previewable: false },
+  ],
+  subjects: [
+    { assignmentId: "a1", curriculumId: "c1", subject: "Physics", pathLabel: "Academic › School › K-12 › CBSE › Class 11", sessionPricePaise: null, studentPaysPaise: null },
+    { assignmentId: "a2", curriculumId: "c2", subject: "Chemistry", pathLabel: "Academic › School › K-12 › CBSE › Class 11", sessionPricePaise: 80000, studentPaysPaise: 94400 },
+  ],
+  pricing: "none",
+  consentDecidedAt: null,
+};
+
+function wrap(children: ReactNode, permissions = ["faculty.read", "faculty.approve", "faculty.documents"]) {
+  return renderToStaticMarkup(
+    <QueryClientProvider client={new QueryClient()}>
+      <PermissionProvider permissions={permissions}>
+        {/* The drawer's title and description need the sheet's context */}
+        <Sheet open>{children}</Sheet>
+      </PermissionProvider>
+    </QueryClientProvider>,
+  );
+}
+
+describe("review drawer (27b)", () => {
+  it("parses the detail contract", () => {
+    expect(facultyDetailSchema.parse(detail)).toEqual(detail);
+    expect(facultyDetailSchema.safeParse({ ...detail, pricing: "maybe" }).success).toBe(false);
+  });
+  it("shows screening, documents, subject cards and the decision for a pending application", () => {
+    const html = wrap(<ReviewView detail={detail} onClose={vi.fn()} />);
+    for (const text of ["AMZ-T-1001", "M.Sc. Physics", "University of Pune", "3–5 years", "Pune", "Photo ID", "PAN card", "1 of 2 verified", "Physics", "No price yet", "Publish profile to discovery once verified", "Verify &amp; publish", "Reject", "Mark as verified"])
+      expect(html).toContain(text);
+    expect(html).toContain("₹800");
+    // Word files are download only
+    expect(html).toContain('aria-label="Preview Photo ID"');
+    expect(html).not.toContain('aria-label="Preview PAN card"');
+    expect(html).toContain('aria-label="Download PAN card"');
+  });
+  it("hides the decision once decided and without faculty.approve", () => {
+    const approved = wrap(<ReviewView detail={{ ...detail, approvalStatus: "approved", status: "verified", pricing: "awaiting_price" }} onClose={vi.fn()} />);
+    expect(approved).not.toContain("Verify &amp; publish");
+    expect(approved).toContain("Price pending");
+    const reader = wrap(<ReviewView detail={detail} onClose={vi.fn()} />, ["faculty.read"]);
+    expect(reader).not.toContain("Verify &amp; publish");
+    expect(reader).not.toContain("Mark as verified");
+    expect(reader).not.toContain('aria-label="Download');
+  });
+  it("shows the rejection reason and the declined prices notice", () => {
+    const rejected = wrap(<ReviewView detail={{ ...detail, approvalStatus: "rejected", status: "rejected", rejectionReason: "Blurred ID" }} onClose={vi.fn()} />);
+    expect(rejected).toContain("Blurred ID");
+    const declined = wrap(<ReviewView detail={{ ...detail, approvalStatus: "approved", status: "verified", pricing: "declined" }} onClose={vi.fn()} />);
+    expect(declined).toContain("declined these prices");
   });
 });
 

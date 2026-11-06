@@ -1,10 +1,8 @@
 import { notFound } from "next/navigation";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
-import { FacultyDirectory } from "@/features/dashboard/faculty-directory";
 
 const sections: Record<string, string> = {
-  faculty: "Faculty",
   bookings: "Bookings",
   reviews: "Reviews",
   progress: "Progress Reports",
@@ -21,7 +19,6 @@ export default async function Page({
   const { section } = await params;
   const { filter } = await searchParams;
   if (!sections[section]) notFound();
-  if (section === "faculty") return <FacultyDirectory />;
   return (
     <>
       <PageHeader title={sections[section]} />

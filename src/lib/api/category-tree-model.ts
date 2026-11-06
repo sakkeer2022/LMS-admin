@@ -94,9 +94,14 @@ export function isSelfOrDescendant(node: Pick<CategoryNode, 'path'>, candidate: 
   return candidate.path === node.path || candidate.path.startsWith(`${node.path}/`);
 }
 
-/** Why "Add sub-category" is unavailable, or null when it is allowed. */
+/**
+ * Why "Add sub-category" is unavailable, or null when it is allowed. A leaf that tutors
+ * teach cannot get sub-categories (the server also refuses one with prices or learners).
+ */
 export function addChildBlockedReason(node: CategoryNode): string | null {
-  return node.isBookable ? 'A bookable category cannot have sub-categories. Turn off booking in Edit first.' : null;
+  return node.isLeaf && node.tutorCount > 0
+    ? `Tutors teach ${node.name}, so it cannot have sub-categories.`
+    : null;
 }
 
 /** Plain-language counts, never a bare number. */
@@ -104,12 +109,11 @@ export function plural(n: number, one: string, many: string) {
   return `${n.toLocaleString('en-IN')} ${n === 1 ? one : many}`;
 }
 export const subCategoryLabel = (n: number) => plural(n, 'sub-category', 'sub-categories');
-export const curriculaLabel = (n: number) => plural(n, 'curriculum', 'curricula');
+export const tutorLabel = (n: number) => plural(n, 'tutor', 'tutors');
 
-/** The row's count label: sub-categories for a branch, curricula for a leaf. */
+/** The row's count label: sub-categories for a branch, tutors for a leaf. */
 export function rowCountLabel(node: CategoryNode) {
-  if (node.childrenCount > 0) return `${subCategoryLabel(node.childrenCount)} · ${curriculaLabel(node.subtreeCurriculaCount)}`;
-  return curriculaLabel(node.curriculaCount);
+  return node.childrenCount > 0 ? subCategoryLabel(node.childrenCount) : tutorLabel(node.tutorCount);
 }
 
 // ── Optimistic edits (rolled back when the server refuses) ───────────────────
@@ -133,8 +137,8 @@ export function applyMove(nodes: CategoryNode[], id: string, parentId: string | 
   const lastOrder = Math.max(0, ...nodes.filter((n) => n.parentId === parentId).map((n) => n.displayOrder));
   return nodes.map((n) => {
     if (!isSelfOrDescendant(node, n)) {
-      if (n.id === node.parentId) return { ...n, childrenCount: n.childrenCount - 1 };
-      if (n.id === parentId) return { ...n, childrenCount: n.childrenCount + 1 };
+      if (n.id === node.parentId) return { ...n, childrenCount: n.childrenCount - 1, isLeaf: n.childrenCount - 1 === 0 };
+      if (n.id === parentId) return { ...n, childrenCount: n.childrenCount + 1, isLeaf: false };
       return n;
     }
     const moved = { ...n, path: newPrefix + n.path.slice(node.path.length), depth: n.depth + delta };
@@ -156,7 +160,7 @@ export interface Placement {
   index: number;
 }
 
-export type InvalidReason = 'PARENT_IS_BOOKABLE' | 'INTO_ITSELF';
+export type InvalidReason = 'PARENT_IN_USE' | 'INTO_ITSELF';
 
 export interface Projection extends Placement {
   depth: number;
@@ -212,14 +216,14 @@ export function placementError(nodes: readonly CategoryNode[], id: string, paren
   const parent = nodes.find((n) => n.id === parentId);
   if (!node || !parent) return null;
   if (isSelfOrDescendant(node, parent)) return 'INTO_ITSELF';
-  if (parent.isBookable) return 'PARENT_IS_BOOKABLE';
+  if (addChildBlockedReason(parent)) return 'PARENT_IN_USE';
   return null;
 }
 
 export function invalidDropMessage(reason: InvalidReason, nodes: readonly CategoryNode[], parentId: string | null) {
   const parent = nodes.find((n) => n.id === parentId)?.name ?? 'that category';
-  return reason === 'PARENT_IS_BOOKABLE'
-    ? `${parent} is bookable, so it cannot have sub-categories.`
+  return reason === 'PARENT_IN_USE'
+    ? `Tutors teach ${parent}, so it cannot have sub-categories.`
     : 'A category cannot move inside itself or one of its sub-categories.';
 }
 
@@ -287,9 +291,21 @@ export function keyboardPlacement(
   }
 }
 
-/** Compact count for a row, as in the design: children for a branch, curricula for a leaf. */
+/** Compact count for a row, as in the design: children for a branch, tutors for a leaf. */
 export function rowCount(node: CategoryNode) {
-  return node.childrenCount > 0 ? node.childrenCount : node.curriculaCount;
+  return node.childrenCount > 0 ? node.childrenCount : node.tutorCount;
+}
+
+/** A code for a new category that no sibling uses yet ("physics", "physics-2", …). */
+export function uniqueSiblingCode(nodes: readonly CategoryNode[], parentId: string | null, name: string) {
+  const base = codeFromName(name) || 'category';
+  const taken = new Set(nodes.filter((n) => n.parentId === parentId).map((n) => n.code));
+  if (!taken.has(base)) return base;
+  for (let i = 2; ; i += 1) {
+    const suffix = `-${i}`;
+    const code = `${base.slice(0, 50 - suffix.length).replace(/-+$/, '')}${suffix}`;
+    if (!taken.has(code)) return code;
+  }
 }
 
 /** A code from a name: lowercase, digits and hyphens, starting with a letter. */

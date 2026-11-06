@@ -7,7 +7,10 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS as DndCSS } from '@dnd-kit/utilities';
 import { BookOpen, ChevronDown, ChevronRight, FileText, Folder, GripVertical, LayoutList, Pencil, Trash2 } from 'lucide-react';
-import { Badge, Button, Switch, Typography, cx } from '@/components/ui';
+import { Badge } from '@/components/shadcn/badge';
+import { Button } from '@/components/shadcn/button';
+import { Switch } from '@/components/shadcn/switch';
+import { cn as cx } from '@/lib/utils';
 import type { CategoryNode } from '@/lib/api/category-tree';
 import {
   invalidDropMessage, isSelfOrDescendant, keyboardPlacement, projectDrop, rowCount, rowCountLabel,
@@ -55,7 +58,7 @@ export interface CategoryTreeListProps {
 function NodeIcon({ node }: { node: CategoryNode }) {
   const Icon = node.depth <= 1 ? Folder : node.depth === 2 ? BookOpen : node.depth === 3 ? FileText : LayoutList;
   return <Icon size={16} strokeWidth={1.75} aria-hidden="true"
-    className={cx('shrink-0', node.depth <= 1 ? 'text-[var(--accent)]' : 'text-[var(--muted)]')} />;
+    className={cx('shrink-0', node.depth <= 1 ? 'text-primary' : 'text-muted-foreground')} />;
 }
 
 /**
@@ -226,11 +229,11 @@ export function CategoryTreeList(props: CategoryTreeListProps) {
 }
 
 function DragPreview({ node }: { node: CategoryNode }) {
-  return <div className="flex items-center gap-2 rounded-[var(--radius)] border border-[var(--accent)] bg-[var(--surface)] px-4 shadow-[0_12px_28px_rgb(15_23_42/0.18)]"
+  return <div className="flex items-center gap-2 rounded-md border border-primary bg-card px-4 shadow-lg"
     style={{ height: ROW_HEIGHT, cursor: 'grabbing' }}>
-    <GripVertical size={16} aria-hidden="true" className="text-[var(--muted)]" />
+    <GripVertical size={16} aria-hidden="true" className="text-muted-foreground" />
     <NodeIcon node={node} />
-    <Typography component="span" variant="body2">{node.name}</Typography>
+    <span className="text-sm">{node.name}</span>
   </div>;
 }
 
@@ -252,16 +255,17 @@ function SortableRow({ row, list, focused, projectedDepth, invalid, onFocusRow }
   const pending = pendingIds.has(node.id);
   const style: CSSProperties = { transform: DndCSS.Translate.toString(transform), transition };
 
-  const actions: ReactNode = canManage && !reorder && <div className="flex shrink-0 items-center gap-1"
+  // As in the design, the switch, Edit and Delete show only on the selected row
+  const actions: ReactNode = canManage && selected && <div className="flex shrink-0 items-center gap-1"
     onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-    <Switch size="sm" checked={node.isActive} disabled={pending} tabIndex={-1}
-      label={`${node.isActive ? 'Deactivate' : 'Activate'} ${node.name}`} onCheckedChange={(value) => onToggleActive(node, value)} />
-    <Button size="icon" variant="ghost" tabIndex={-1} aria-label={`Edit ${node.name}`} title="Edit" disabled={pending}
-      style={{ width: 28, height: 28, minHeight: 28, padding: 0 }} onClick={() => onEdit(node)}>
+    <Switch checked={node.isActive} disabled={pending} tabIndex={-1}
+      aria-label={`${node.isActive ? 'Disable' : 'Enable'} ${node.name}`} onCheckedChange={(value) => onToggleActive(node, value)} />
+    <Button size="icon-sm" variant="ghost" tabIndex={-1} aria-label={`Edit ${node.name}`} title="Edit" disabled={pending}
+      className="size-7" onClick={() => onEdit(node)}>
       <Pencil size={14} aria-hidden="true" />
     </Button>
-    <Button size="icon" variant="ghost" tabIndex={-1} aria-label={`Delete ${node.name}`} title="Delete" disabled={pending}
-      style={{ width: 28, height: 28, minHeight: 28, padding: 0 }} onClick={() => onDelete(node)}>
+    <Button size="icon-sm" variant="ghost" tabIndex={-1} aria-label={`Delete ${node.name}`} title="Delete" disabled={pending}
+      className="size-7" onClick={() => onDelete(node)}>
       <Trash2 size={14} aria-hidden="true" />
     </Button>
   </div>;
@@ -269,34 +273,33 @@ function SortableRow({ row, list, focused, projectedDepth, invalid, onFocusRow }
   return <li ref={setNodeRef} style={style} role="treeitem" data-tree-id={node.id} aria-level={row.level} aria-setsize={row.siblings}
     aria-posinset={row.index + 1} aria-label={`${node.name}, ${rowCountLabel(node)}${node.isActive ? '' : ', inactive'}`}
     aria-expanded={hasChildren ? open : undefined} aria-selected={selected} tabIndex={focused ? 0 : -1}
-    className="group outline-none focus-visible:[&>div]:outline focus-visible:[&>div]:outline-2 focus-visible:[&>div]:-outline-offset-2 focus-visible:[&>div]:outline-[var(--accent)]"
+    className="group outline-none focus-visible:[&>div]:outline focus-visible:[&>div]:outline-2 focus-visible:[&>div]:-outline-offset-2 focus-visible:[&>div]:outline-ring"
     onFocus={(e) => { if (e.target === e.currentTarget) onFocusRow(); }}
     onClick={() => { onFocusRow(); if (!reorder) onSelect(node); }}
     {...(reorder ? listeners : {})}>
     <div className={cx(
-      'flex items-center gap-2 border-b border-[var(--border)] pr-4 transition-colors',
-      selected ? 'bg-[var(--accent-soft)]' : !reorder && 'hover:bg-[var(--subtle)]',
-      reorder && 'cursor-grab bg-[var(--surface)] active:cursor-grabbing',
+      'flex items-center gap-2 border-b border-border pr-4 transition-colors',
+      selected ? 'bg-accent' : !reorder && 'hover:bg-sunken',
+      reorder && 'cursor-grab bg-card active:cursor-grabbing',
       isDragging && (invalid
-        ? 'border border-dashed border-[var(--danger)] bg-[var(--danger-bg)]'
-        : 'border border-dashed border-[var(--accent)] bg-[var(--accent-soft)]'),
+        ? 'border border-dashed border-destructive bg-error-subtle'
+        : 'border border-dashed border-primary bg-accent'),
       !node.isActive && !isDragging && 'opacity-60',
     )} style={{ height: ROW_HEIGHT, paddingInlineStart: 16 + depth * INDENT, transition: 'padding-inline-start 120ms ease' }}>
-      {reorder && <GripVertical size={16} aria-hidden="true" className="-ml-1 shrink-0 text-[var(--muted)]" />}
+      {reorder && <GripVertical size={16} aria-hidden="true" className="-ml-1 shrink-0 text-muted-foreground" />}
       {hasChildren
-        ? <Button size="icon" variant="ghost" tabIndex={-1} aria-hidden="true" style={{ width: 20, height: 20, minHeight: 20, padding: 0 }}
+        ? <Button size="icon-xs" variant="ghost" tabIndex={-1} aria-hidden="true" className="size-5"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onToggle(node.id, !open); }}>
             {open ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
           </Button>
         : <span className="inline-block w-5 shrink-0" aria-hidden="true" />}
       <NodeIcon node={node} />
-      <Typography component="span" variant={node.depth === 0 ? 'subtitle2' : 'body2'} className="min-w-0 truncate">{node.name}</Typography>
-      {node.isBookable && <Badge tone="info" className="shrink-0">Bookable</Badge>}
-      {!node.isActive && <Badge tone="warning" className="shrink-0">Inactive</Badge>}
-      <Typography component="span" variant="caption" tone="muted" className="ml-auto shrink-0 tabular-nums" title={rowCountLabel(node)} aria-hidden="true">
+      <span className={cx('min-w-0 truncate text-sm', node.depth === 0 && 'font-semibold')}>{node.name}</span>
+      {!node.isActive && <Badge variant="warning" className="shrink-0">Inactive</Badge>}
+      <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums" title={rowCountLabel(node)} aria-hidden="true">
         {rowCount(node)}
-      </Typography>
+      </span>
       {actions}
     </div>
   </li>;

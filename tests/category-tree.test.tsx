@@ -4,35 +4,35 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { ApiError } from '../src/lib/api/contracts';
 import { describeApiError } from '../src/lib/api/errors';
-import { categoryDetailSchema, categoryTreeSchema, offeringSchema, type CategoryNode } from '../src/lib/api/category-tree';
+import { categoryDetailSchema, categoryTreeSchema, type CategoryNode } from '../src/lib/api/category-tree';
 import {
   addChildBlockedReason, applyMove, applyRelocation, applyReorder, breadcrumb, buildTree, codeFromName, keyboardPlacement, placementError,
-  projectDrop, relocation, rowCount, rowCountLabel, searchMatches, visibleRows,
+  projectDrop, relocation, rowCount, rowCountLabel, searchMatches, uniqueSiblingCode, visibleRows,
 } from '../src/lib/api/category-tree-model';
-import { Switch, VirtualTree, VIRTUALIZE_AFTER } from '../src/components/ui';
+import { Switch } from '../src/components/shadcn/switch';
 import { CategoryTreeList } from '../src/features/category-tree/components/category-tree-list';
 import { PermissionProvider } from '../src/components/security/permission-provider';
-import { CategoryDetailView } from '../src/features/category-tree/components/category-detail-panel';
+import { CategoryDetailView, CategoryForm } from '../src/features/category-tree/components/category-detail-panel';
 import { CategoryTreePage } from '../src/features/category-tree/components/category-tree-page';
 
-// Shapes copied from live responses of the ADR-0005 backend (reference + demo seed)
+// Shapes copied from live responses of the backend (migration 20261105090000_category_simple_leaves)
 let seq = 0;
 const node = (code: string, parent: CategoryNode | null, extra: Partial<CategoryNode> = {}): CategoryNode => ({
   id: `id-${code}`, parentId: parent?.id ?? null, code, name: code.toUpperCase(), path: parent ? `${parent.path}/${code}` : code,
-  depth: parent ? parent.depth + 1 : 0, isBookable: false, requiresBoard: false, requiresLevel: false, isActive: true, displayOrder: ++seq,
-  version: 1, childrenCount: 0, curriculaCount: 0, subtreeCurriculaCount: 0, createdAt: '2026-11-02T07:10:09.296Z', updatedAt: '2026-11-02T07:10:09.296Z', ...extra,
+  depth: parent ? parent.depth + 1 : 0, isLeaf: true, isActive: true, displayOrder: ++seq,
+  version: 1, childrenCount: 0, tutorCount: 0, createdAt: '2026-11-02T07:10:09.296Z', updatedAt: '2026-11-02T07:10:09.296Z', ...extra,
 });
-const academic = node('academic', null, { name: 'Academic', childrenCount: 2, subtreeCurriculaCount: 7 });
-const school = node('school', academic, { name: 'School', requiresBoard: true, childrenCount: 1, subtreeCurriculaCount: 6 });
-const k12 = node('k-12', school, { name: 'K-12', isBookable: true, requiresBoard: true, requiresLevel: true, curriculaCount: 6, subtreeCurriculaCount: 6 });
-const university = node('university', academic, { name: 'University', isBookable: true, curriculaCount: 1, subtreeCurriculaCount: 1 });
+const academic = node('academic', null, { name: 'Academic', isLeaf: false, childrenCount: 2 });
+const school = node('school', academic, { name: 'School', isLeaf: false, childrenCount: 1 });
+// K-12 is a leaf that two tutors teach; University is a leaf nobody teaches yet
+const k12 = node('k-12', school, { name: 'K-12', tutorCount: 2 });
+const university = node('university', academic, { name: 'University' });
 const nonAcademic = node('non-academic', null, { name: 'Non-academic' });
 const nodes = [academic, school, k12, university, nonAcademic];
 
 const liveDetail = {
-  ...k12, description: null, activeCurriculaCount: 6, studentCount: 0, descendantCount: 0,
+  ...k12, description: null, descendantCount: 0,
   breadcrumb: [{ id: academic.id, name: 'Academic', path: 'academic' }, { id: school.id, name: 'School', path: 'academic/school' }],
-  allowedLevels: [{ id: 'l1', code: 'class-1', name: 'Class 1', isActive: true }, { id: 'l2', code: 'class-2', name: 'Class 2', isActive: false }],
 };
 
 function wrap(children: ReactNode, permissions = ['catalogue.read', 'catalogue.manage']) {
@@ -40,10 +40,9 @@ function wrap(children: ReactNode, permissions = ['catalogue.read', 'catalogue.m
 }
 
 describe('API schemas accept the live response shapes', () => {
-  it('parses the tree, a detail and an offering', () => {
-    expect(categoryTreeSchema.parse({ nodes, stats: { categories: 5, bookableLeaves: 2, curricula: 7 }, generatedAt: '2026-11-02T07:10:09.296Z' }).nodes).toHaveLength(5);
+  it('parses the tree and a detail', () => {
+    expect(categoryTreeSchema.parse({ nodes, stats: { categories: 5, leaves: 3 }, generatedAt: '2026-11-02T07:10:09.296Z' }).nodes).toHaveLength(5);
     expect(categoryDetailSchema.parse(liveDetail).breadcrumb[1].name).toBe('School');
-    expect(offeringSchema.parse({ curriculumId: 'c', categoryId: k12.id, subject: { id: 's', name: 'Physics' }, board: { id: 'b', name: 'CBSE' }, level: null, isActive: true }).level).toBeNull();
   });
 
   it('maps typed error codes, including stale versions', () => {
@@ -68,9 +67,9 @@ describe('tree model', () => {
   });
 
   it('labels counts in words, never as bare numbers', () => {
-    expect(rowCountLabel(school)).toBe('1 sub-category · 6 curricula');
-    expect(rowCountLabel(university)).toBe('1 curriculum');
-    expect(rowCountLabel(nonAcademic)).toBe('0 curricula');
+    expect(rowCountLabel(school)).toBe('1 sub-category');
+    expect(rowCountLabel(k12)).toBe('2 tutors');
+    expect(rowCountLabel(nonAcademic)).toBe('0 tutors');
   });
 
   it('searches names and keeps the ancestors of a match open', () => {
@@ -80,8 +79,9 @@ describe('tree model', () => {
     expect(searchMatches(nodes, '  ')).toBeNull();
   });
 
-  it('blocks adding sub-categories to a bookable leaf with a reason', () => {
-    expect(addChildBlockedReason(k12)).toMatch(/bookable category cannot have sub-categories/);
+  it('blocks adding sub-categories only to a leaf that tutors teach', () => {
+    expect(addChildBlockedReason(k12)).toBe('Tutors teach K-12, so it cannot have sub-categories.');
+    expect(addChildBlockedReason(university)).toBeNull();
     expect(addChildBlockedReason(school)).toBeNull();
   });
 
@@ -90,11 +90,17 @@ describe('tree model', () => {
     expect(moved.find((n) => n.id === school.id)).toMatchObject({ parentId: nonAcademic.id, path: 'non-academic/school', depth: 1 });
     expect(moved.find((n) => n.id === k12.id)).toMatchObject({ path: 'non-academic/school/k-12', depth: 2 });
     expect(moved.find((n) => n.id === academic.id)?.childrenCount).toBe(1);
-    expect(moved.find((n) => n.id === nonAcademic.id)?.childrenCount).toBe(1);
+    expect(moved.find((n) => n.id === nonAcademic.id)).toMatchObject({ childrenCount: 1, isLeaf: false });
   });
 
   it('labels a row with a bare count, as in the design, and spells it out for screen readers', () => {
-    expect([rowCount(school), rowCount(k12), rowCount(nonAcademic)]).toEqual([1, 6, 0]);
+    expect([rowCount(school), rowCount(k12), rowCount(nonAcademic)]).toEqual([1, 2, 0]);
+  });
+  it('makes a code from the name that no sibling uses', () => {
+    expect(uniqueSiblingCode(nodes, academic.id, 'Competitive')).toBe('competitive');
+    expect(uniqueSiblingCode(nodes, academic.id, 'School')).toBe('school-2');
+    expect(uniqueSiblingCode([...nodes, node('school-2', academic)], academic.id, 'School')).toBe('school-3');
+    expect(uniqueSiblingCode(nodes, null, 'School')).toBe('school');
   });
   it('suggests a valid code from a name', () => {
     expect(codeFromName('JEE / NEET')).toBe('jee-neet');
@@ -121,12 +127,14 @@ describe('drag and drop (reorder mode)', () => {
     expect(out).toMatchObject({ parentId: null, depth: 0, index: 1 });
   });
 
-  it('marks a drop under a bookable leaf as invalid', () => {
-    // university directly below the bookable K-12, dragged right: K-12 would be its parent
+  it('marks a drop under a leaf that tutors teach as invalid', () => {
+    // university directly below K-12 (taught), dragged right: K-12 would be its parent
     const p = projectDrop(flat, nodes, nonAcademic.id, nonAcademic.id, 3 * 20, 20)!;
     expect(p).toMatchObject({ parentId: university.id, depth: 2 });
     const underK12 = projectDrop(flat, nodes, university.id, university.id, 40, 20)!;
-    expect(underK12).toMatchObject({ parentId: k12.id, invalid: 'PARENT_IS_BOOKABLE' });
+    expect(underK12).toMatchObject({ parentId: k12.id, invalid: 'PARENT_IN_USE' });
+    // A leaf nobody teaches can take sub-categories
+    expect(p.invalid).toBeNull();
   });
 
   it('refuses a cycle and does nothing for an unchanged position', () => {
@@ -146,8 +154,9 @@ describe('drag and drop (reorder mode)', () => {
     expect(keyboardPlacement(nodes, school.id, 'ArrowUp')).toBeNull();
     expect(keyboardPlacement(nodes, university.id, 'ArrowRight')).toEqual({ parentId: school.id, index: 1 });
     expect(keyboardPlacement(nodes, k12.id, 'ArrowLeft')).toEqual({ parentId: academic.id, index: 1 });
-    const bookableTarget = [...nodes, node('olympiad', academic, { displayOrder: 99 })];
-    expect(keyboardPlacement(bookableTarget, 'id-olympiad', 'ArrowRight')).toEqual({ invalid: 'PARENT_IS_BOOKABLE', parentId: university.id });
+    const taught = nodes.map((n) => (n.id === university.id ? { ...n, tutorCount: 1 } : n));
+    const withTarget = [...taught, node('olympiad', academic, { displayOrder: 99 })];
+    expect(keyboardPlacement(withTarget, 'id-olympiad', 'ArrowRight')).toEqual({ invalid: 'PARENT_IN_USE', parentId: university.id });
   });
 });
 
@@ -158,13 +167,15 @@ describe('category tree list', () => {
     onRelocate={() => undefined} onInvalidDrop={() => undefined} canManage={canManage} pendingIds={new Set([university.id])}
     onEdit={() => undefined} onDelete={() => undefined} onToggleActive={() => undefined} />);
 
-  it('shows the Active switch, Edit and Delete on every row', () => {
+  it('shows the switch, Edit and Delete only on the selected row, as in the design', () => {
     const html = render(false);
-    expect(html.match(/role="switch"/g)).toHaveLength(5);
-    expect(html.match(/aria-label="Edit /g)).toHaveLength(5);
-    expect(html.match(/aria-label="Delete /g)).toHaveLength(5);
-    expect(html).toContain('aria-label="K-12, 6 curricula"');
-    expect(html).toMatch(/aria-label="Edit University"[^>]*disabled/);
+    expect(html.match(/role="switch"/g)).toHaveLength(1);
+    expect(html.match(/aria-label="Edit /g)).toHaveLength(1);
+    expect(html.match(/aria-label="Delete /g)).toHaveLength(1);
+    expect(html).toContain('aria-label="Edit K-12"');
+    expect(html).toContain('aria-label="Disable K-12"');
+    expect(html).toContain('aria-label="K-12, 2 tutors"');
+    expect(html).not.toContain('Bookable');
   });
 
   it('hides the row actions in reorder mode and without catalogue.manage', () => {
@@ -176,69 +187,77 @@ describe('category tree list', () => {
 
 describe('Switch', () => {
   it('is a labelled switch reporting its state', () => {
-    const html = renderToStaticMarkup(<Switch checked label="Deactivate School" onCheckedChange={() => undefined} />);
+    const html = renderToStaticMarkup(<Switch checked aria-label="Disable School" onCheckedChange={() => undefined} />);
     expect(html).toContain('role="switch"');
     expect(html).toContain('aria-checked="true"');
-    expect(html).toContain('aria-label="Deactivate School"');
-  });
-});
-
-describe('VirtualTree', () => {
-  const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ node: i, id: `r${i}`, level: 1, index: i, siblings: n, hasChildren: false, parentId: null }));
-  const render = (n: number) => renderToStaticMarkup(<VirtualTree label="Big tree" rows={rows(n)} expanded={new Set()} onToggle={() => undefined}
-    onSelect={() => undefined} renderLabel={(r) => `Row ${r.node}`} />);
-
-  it('renders every row of a small tree with tree semantics', () => {
-    const html = render(10);
-    expect(html.match(/role="treeitem"/g)).toHaveLength(10);
-    expect(html).toContain('aria-setsize="10"');
-    expect(html).toContain('aria-posinset="10"');
-  });
-
-  it('renders only the visible window of a large tree', () => {
-    const html = render(VIRTUALIZE_AFTER * 10);
-    const items = html.match(/role="treeitem"/g)?.length ?? 0;
-    expect(items).toBeGreaterThan(0);
-    expect(items).toBeLessThan(100);
+    expect(html).toContain('aria-label="Disable School"');
   });
 });
 
 describe('category detail panel', () => {
-  const actions = { onAddChild: () => undefined, onEdit: () => undefined, onDelete: () => undefined, onToggleActive: () => undefined, onError: () => undefined };
+  const actions = { onAddChild: () => undefined, onEdit: () => undefined, onDelete: () => undefined, onToggleActive: () => undefined };
 
-  it('matches the design: breadcrumb, status, count card, Active switch, and Add sub-category disabled on a bookable leaf', () => {
-    const html = wrap(<CategoryDetailView tenant="t1" detail={categoryDetailSchema.parse(liveDetail)} node={k12} canManage pending={false} {...actions} />);
+  it('shows breadcrumb, status, count card and the switch, with no booking settings', () => {
+    const html = wrap(<CategoryDetailView detail={categoryDetailSchema.parse(liveDetail)} node={k12} canManage pending={false} {...actions} />);
     expect(html).toContain('Academic › School › K-12');
-    expect(html).toMatch(/role="switch" aria-checked="true" aria-label="Deactivate K-12"/);
+    expect(html).toMatch(/role="switch" aria-checked="true"[^>]*aria-label="Disable K-12"/);
     expect(html).toContain('Status');
-    expect(html).toMatch(/ui-typography--h1 tabular-nums">6<\/p><span[^>]*>Curricula/);
-    expect(html).toContain('Class 1');
+    expect(html).toMatch(/tabular-nums">2<\/p><span[^>]*>Tutor count/);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*><svg[^>]*lucide-plus[\s\S]*?Add sub-category/);
-    expect(html).not.toContain('>Move<');
-    expect(html).toContain('A bookable category cannot have sub-categories');
-    expect(html).toContain('Learner chooses');
+    expect(html).toContain('Tutors teach K-12, so it cannot have sub-categories.');
+    for (const gone of ['Bookable', 'Booking', 'Learner chooses', 'Allowed levels', 'Offerings', 'Curricula']) expect(html).not.toContain(gone);
+  });
+
+  it('offers Add sub-category on a leaf nobody teaches and counts sub-categories on a branch', () => {
+    const uni = wrap(<CategoryDetailView detail={categoryDetailSchema.parse({ ...liveDetail, ...university })} node={university} canManage pending={false} {...actions} />);
+    expect(uni).not.toMatch(/disabled=""[^>]*><svg[^>]*lucide-plus/);
+    const branch = wrap(<CategoryDetailView detail={categoryDetailSchema.parse({ ...liveDetail, ...school })} node={school} canManage pending={false} {...actions} />);
+    expect(branch).toMatch(/tabular-nums">1<\/p><span[^>]*>Sub category count/);
   });
 
   it('hides every action without catalogue.manage', () => {
-    const html = wrap(<CategoryDetailView tenant="t1" detail={categoryDetailSchema.parse(liveDetail)} node={k12} canManage={false} pending={false} {...actions} />, ['catalogue.read']);
+    const html = wrap(<CategoryDetailView detail={categoryDetailSchema.parse(liveDetail)} node={k12} canManage={false} pending={false} {...actions} />, ['catalogue.read']);
     expect(html).not.toContain('Delete');
     expect(html).not.toContain('Add sub-category');
   });
 });
 
+describe('category form', () => {
+  it('edits only the name, as in the design: title, breadcrumb, Name, Save and Cancel', () => {
+    const html = wrap(<CategoryForm mode={{ kind: 'edit', node: k12 }} nodes={nodes} onCancel={() => undefined} onSaved={() => undefined} />);
+    expect(html).toContain('>Edit category</h2>');
+    expect(html).toContain('Academic › School › K-12');
+    expect(html).toContain('>Name<');
+    expect(html).toContain('value="K-12"');
+    expect(html).toMatch(/>Save<\/button>/);
+    expect(html).toMatch(/lucide-x[\s\S]*?Cancel<\/button>/);
+    expect(html.match(/<input/g)).toHaveLength(1);
+    for (const gone of ['Code', 'Bookable', 'board', 'level']) expect(html).not.toContain(gone);
+  });
+
+  it('adds a sub-category under the chosen parent with the same single field', () => {
+    const html = wrap(<CategoryForm mode={{ kind: 'create', parent: school }} nodes={nodes} onCancel={() => undefined} onSaved={() => undefined} />);
+    expect(html).toContain('>Add sub-category</h2>');
+    expect(html).toContain('Academic › School › New category');
+    expect(html.match(/<input/g)).toHaveLength(1);
+    const root = wrap(<CategoryForm mode={{ kind: 'create', parent: null }} nodes={nodes} onCancel={() => undefined} onSaved={() => undefined} />);
+    expect(root).toContain('>Add category</h2>');
+  });
+});
+
 describe('category tree page', () => {
   it('shows a loading state, and Reorder and Add category only to managers', () => {
-    const html = wrap(<CategoryTreePage tenant="t1" />);
+    const html = wrap(<CategoryTreePage />);
     expect(html).toContain('Category manager');
-    expect(html).toContain('>Reorder</button>');
+    expect(html).toMatch(/>Reorder<\/button>/);
     expect(html).toContain('>Add category</button>');
     expect(html).toContain('opacity-0');
-    const reader = wrap(<CategoryTreePage tenant="t1" />, ['catalogue.read']);
+    const reader = wrap(<CategoryTreePage />, ['catalogue.read']);
     expect(reader).not.toContain('Add category');
     expect(reader).not.toContain('>Reorder<');
   });
 
   it('refuses without catalogue.read', () => {
-    expect(wrap(<CategoryTreePage tenant="t1" />, [])).toContain('permission to view the catalogue');
+    expect(wrap(<CategoryTreePage />, [])).toContain('permission to view the catalogue');
   });
 });
