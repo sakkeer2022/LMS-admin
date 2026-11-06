@@ -101,3 +101,40 @@ export async function api<T>(
     );
   return body;
 }
+
+/**
+ * GET a file (a PDF, for example) as a Blob. Same CSRF-free GET, one refresh and retry on 401 as `api`; an
+ * error response is read as the usual JSON envelope and thrown as an ApiError.
+ */
+export async function apiBlob(
+  path: string,
+  init: RequestInit = {},
+): Promise<Blob> {
+  if (!/^\/[a-z0-9][a-z0-9/_?=&%.:-]*$/i.test(path) || path.includes(".."))
+    throw new Error("Invalid API path");
+  const send = () =>
+    fetch(`${base}${path}`, {
+      ...init,
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+  let response = await send();
+  if (response.status === 401) {
+    await sharedRefresh();
+    response = await send();
+  }
+  if (!response.ok) {
+    let message = "The file could not be downloaded";
+    let traceId: string | undefined;
+    try {
+      const body = (await response.json()) as ApiEnvelope<never>;
+      message = body.message ?? message;
+      traceId = !body.success ? body.traceId : undefined;
+    } catch {
+      // keep the generic message
+    }
+    throw new ApiError(response.status, message, undefined, traceId);
+  }
+  return response.blob();
+}
