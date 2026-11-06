@@ -13,12 +13,13 @@ src/
     layout.tsx, providers.tsx, globals.css, error.tsx, loading.tsx, page.tsx
     (auth)/login, recovery
     (admin)/admin/layout.tsx     requireAdmin + PermissionProvider + AdminShell
-      dashboard/ users/ settings/ audit/ reports/ profile/ [section]/ [...unknown]/
+      dashboard/ users/ students/ legal/ settings/ audit/ reports/ profile/ [section]/ [...unknown]/
     access-denied/
   components/
     shadcn/ (primitives)  layout/ (admin-shell, sidebar-nav, topbar, page-header, empty-state)
+    forms/ (date picker)
     data-table/  auth/  settings/  security/ (permission-provider, sensitive-boundary)  feedback/
-  features/{auth,users,dashboard,profile,settings}/{api,components,types,schemas}
+  features/{auth,users,dashboard,profile,settings,legal,students}/{api,components,types,schemas}
   lib/auth/{access,server,portal-config}.ts   lib/api/{client,contracts}.ts
   lib/currency/inr.ts  lib/exports/download.ts
 tests/
@@ -37,7 +38,7 @@ Pages and layouts are Server Components by default; add `'use client'` only to i
 - A 401 triggers one refresh (`POST /auth/refresh`, serialized with Web Locks) and one retry. The login page also tries a silent refresh when it has a `redirect` target.
 - Sign-in state is decided by the backend: `requireAdmin` calls `GET /auth/me` with the access cookie and requires an active user with the `admin` role (the backend shows `super_admin` as `admin`). This app holds no JWT secret and never decodes or trusts a token itself.
 - Permissions for `Can`/`usePermission` come from the user's roles in `/auth/me`; they only hide controls. The backend enforces every action.
-- Sensitive actions (settings changes and others the contract marks "recent reauthentication required") need `POST /auth/reauthenticate` first; the backend answers 403 "Recent re-authentication required" when the session is not fresh. Reuse the password field in a modal.
+- Sensitive actions (settings changes and others the contract marks "recent reauthentication required") need `POST /auth/reauthenticate` first; the backend answers 403 "Recent re-authentication required" when the session is not fresh. `ReauthProvider` (`components/security/reauth-provider.tsx`, mounted in the admin layout) does this: wrap the call in `useWithReauth()`; on that 403 it asks for the password in a dialog, confirms it and runs the call once more. `apiBlob` (in `lib/api/client.ts`) fetches files such as the signed consent PDF.
 
 ## Backend contract
 
