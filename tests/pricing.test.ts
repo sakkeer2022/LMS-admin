@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { priceRuleSchema, resolveResultSchema } from '../src/lib/api/pricing';
-import { bulkRowErrors, dropEdit, editErrors, pendingChanges, setEdit } from '../src/features/pricing/schemas/pricing';
+import { bulkRowErrors, dropEdit, editErrors, pendingChanges, pendingCreates, setEdit } from '../src/features/pricing/schemas/pricing';
 
 describe('pricing schemas accept the live response shapes', () => {
   it('parses a price rule and both resolution outcomes', () => {
@@ -23,15 +23,28 @@ describe('bulk price edit tracking (screen 29b)', () => {
     expect(Object.keys(editErrors(edits))).toEqual(['c']);
     expect(pendingChanges(dropEdit(edits, 'b'))).toEqual([]);
   });
-  it('maps rejected rows back from changes[i]', () => {
+  it('maps rejected rows back from changes[i] and creates[i]', () => {
     expect(bulkRowErrors({ 'changes[1]': 'stale' }, [{ id: 'a' }, { id: 'b' }])).toEqual({ b: 'stale' });
+    expect(bulkRowErrors({ 'creates[0]': 'overlap', 'changes[0]': 'stale' }, [{ id: 'a' }], [{ key: 'new:f1:c1' }])).toEqual({
+      a: 'stale',
+      'new:f1:c1': 'overlap',
+    });
+  });
+  it('turns amounts typed on Not priced rows into creates, and ignores empty ones', () => {
+    const create = { curriculumId: 'c1', facultyId: 'f1' };
+    let edits = setEdit({}, 'new:f1:c1', { input: '1,200', originalPaise: null, revision: 0, create });
+    edits = setEdit(edits, 'new:f1:c2', { input: '', originalPaise: null, revision: 0, create: { ...create, curriculumId: 'c2' } });
+    edits = setEdit(edits, 'a', { input: '1500', originalPaise: 145000, revision: 2 });
+    expect(pendingCreates(edits)).toEqual([{ key: 'new:f1:c1', curriculumId: 'c1', facultyId: 'f1', sessionPricePaise: 120000 }]);
+    expect(pendingChanges(edits)).toEqual([{ id: 'a', sessionPricePaise: 150000, expectedRevision: 2 }]);
+    expect(editErrors(edits)).toEqual({});
   });
 });
 
 
 import { awaitingPriceSchema } from '../src/lib/api/pricing';
 import { offeringTreeSchema, pickerOfferings } from '../src/lib/api/offering-tree';
-import { groupByTutor, presetFor } from '../src/features/pricing/components/awaiting-prices';
+import { awaitingKey, presetFor, visibleAwaiting } from '../src/features/pricing/components/awaiting-rows';
 import { chosenOffering } from '../src/features/pricing/components/offering-picker';
 
 const tree = offeringTreeSchema.parse({
@@ -78,9 +91,17 @@ describe('awaiting tutor prices', () => {
       board: 'CBSE', level: 'Class 11', defaultPrice,
     });
 
-  it('groups cards by tutor in the server order', () => {
-    const groups = groupByTutor([row('f1', 'c1'), row('f2', 'c1'), row('f1', 'c2')]);
-    expect(groups.map((g) => [g.facultyId, g.cards.map((c) => c.curriculumId)])).toEqual([['f1', ['c1', 'c2']], ['f2', ['c1']]]);
+  it('lists Not priced rows on the first page, filtered like the rules', () => {
+    const cards = [row('f1', 'c1'), row('f2', 'c2')];
+    const keys = (list: typeof cards) => list.map(awaitingKey);
+    expect(keys(visibleAwaiting(cards, { page: 1, status: 'active' }))).toEqual(['new:f1:c1', 'new:f2:c2']);
+    expect(visibleAwaiting(cards, { page: 2, status: 'active' })).toEqual([]);
+    expect(visibleAwaiting(cards, { page: 1, status: 'inactive' })).toEqual([]);
+    expect(keys(visibleAwaiting(cards, { page: 1, status: 'all', q: 'tutor F2' }))).toEqual(['new:f2:c2']);
+    expect(keys(visibleAwaiting(cards, { page: 1, status: 'active', q: 'k-12' }))).toHaveLength(2);
+    expect(visibleAwaiting(cards, { page: 1, status: 'active', category: 'Academic' })).toHaveLength(2);
+    expect(visibleAwaiting(cards, { page: 1, status: 'active', category: 'Languages' })).toEqual([]);
+    expect(visibleAwaiting(cards, { page: 1, status: 'active', category: null })).toEqual([]);
   });
   it('pre-fills the tutor price with the default price when there is one', () => {
     expect(presetFor(row('f1', 'c1', amounts))).toEqual({

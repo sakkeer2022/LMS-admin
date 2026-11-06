@@ -23,7 +23,7 @@ import { OfferingPicker, chosenOffering, emptyChoice, type OfferingChoice } from
 /** 18% until the GST setting (LMS-90) exists; the server applies it, this is display only. */
 const DEFAULT_GST_BPS = 1800;
 
-/** A new tutor price for one subject card, opened from "Awaiting tutor price". */
+/** A new tutor price for one subject card, opened from a "Not priced" row's menu. */
 export interface TutorPricePreset {
   facultyId: string;
   facultyName: string;
@@ -142,7 +142,7 @@ export function PriceRuleDrawer({
             <SheetDescription>Session price before GST, per 60-minute session.</SheetDescription>
           </SheetHeader>
           <form id={formId} onSubmit={submit} noValidate aria-busy={pending || undefined} className="flex flex-col gap-4 px-4">
-            <TextField label="Tutor" readOnly value={tutorLabel} hint={!rule && !preset ? "Tutor prices are set from the tutor's subject cards above." : undefined} />
+            <TextField label="Tutor" readOnly value={tutorLabel} hint={!rule && !preset ? "Tutor prices are set from the Not priced rows in the table." : undefined} />
             {rule ? (
               <TextField label="Offering" readOnly value={`${rule.subjectName} · ${rule.pathLabel}`} />
             ) : preset ? (

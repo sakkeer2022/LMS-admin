@@ -93,6 +93,12 @@ export interface BulkPriceChange {
   sessionPricePaise: number;
   expectedRevision: number;
 }
+/** First tutor price for a subject card awaiting one (active from now, no end date). */
+export interface BulkPriceCreate {
+  curriculumId: string;
+  facultyId: string;
+  sessionPricePaise: number;
+}
 
 export const pricingKeys = {
   all: () => ['pricing'] as const,
@@ -149,10 +155,10 @@ export function useDeactivatePriceRule() {
   const update = useUpdatePriceRule();
   return { ...update, mutateAsync: (rule: Pick<PriceRule, 'id' | 'revision'>) => update.mutateAsync({ id: rule.id, expectedRevision: rule.revision, isActive: false }) };
 }
-/** All or nothing: a 409 lists the rejected rows as errors["changes[i]"]. */
+/** All or nothing: a 409 lists the rejected rows as errors["changes[i]"] / errors["creates[i]"]. */
 export function useBulkUpdatePrices() {
-  return usePricingMutation(async (changes: BulkPriceChange[]) =>
-    z.array(priceRuleSchema).parse((await api<unknown>('/admin/prices/bulk', send('PUT', { changes }))).data));
+  return usePricingMutation(async (body: { changes: BulkPriceChange[]; creates: BulkPriceCreate[] }) =>
+    z.array(priceRuleSchema).parse((await api<unknown>('/admin/prices/bulk', send('PUT', body))).data));
 }
 
 export function useResolvePrice(params: { curriculumId?: string; facultyId?: string }) {

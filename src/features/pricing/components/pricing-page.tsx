@@ -25,16 +25,27 @@ import { useCategoryTree } from "@/lib/api/category-tree";
 import { describeApiError } from "@/lib/api/errors";
 import { pickerOfferings, useOfferingTree } from "@/lib/api/offering-tree";
 import {
+  useAwaitingPrices,
   useBulkUpdatePrices,
   useDeactivatePriceRule,
   usePriceRules,
+  type AwaitingPrice,
   type PriceRule,
   type PriceRuleFilters,
 } from "@/lib/api/pricing";
 import { formatBps, formatPaise, parseRupeesToPaise, previewStudentPays } from "@/lib/currency/money";
 import { cn } from "@/lib/utils";
-import { bulkRowErrors, dropEdit, editErrors, pendingChanges, setEdit, type PriceEdits } from "../schemas/pricing";
-import { AwaitingPrices } from "./awaiting-prices";
+import {
+  bulkRowErrors,
+  dropEdit,
+  editErrors,
+  pendingChanges,
+  pendingCreates,
+  setEdit,
+  type PriceEdit,
+  type PriceEdits,
+} from "../schemas/pricing";
+import { awaitingKey, presetFor, visibleAwaiting } from "./awaiting-rows";
 import { PriceRuleDrawer, type TutorPricePreset } from "./price-rule-drawer";
 import { ResolutionPanel } from "./resolution-panel";
 
@@ -67,7 +78,13 @@ function useUrlFilters() {
 
 type DrawerState = { rule?: PriceRule; preset?: TutorPricePreset };
 
-/** Screen 29: Catalogue → Pricing (LMS-58, LMS-59). */
+/** 18% until the GST setting (LMS-90) exists; display only, the server computes GST on save. */
+const DEFAULT_GST_BPS = 1800;
+
+/**
+ * Screen 29: Catalogue → Pricing (LMS-58, LMS-59). Subject cards still awaiting a tutor price
+ * are "Not priced" rows at the top of the table, edited and saved with the other rows.
+ */
 export function PricingPage() {
   const canRead = usePermission("pricing.read");
   const canManage = usePermission("pricing.manage");
@@ -75,6 +92,7 @@ export function PricingPage() {
   const { filters, status, search, set } = useUrlFilters();
   const [searchInput, setSearchInput] = useState(search);
   const rules = usePriceRules(filters, canRead);
+  const awaiting = useAwaitingPrices(canRead);
   const tree = useCategoryTree(canRead && canReadCatalogue);
   const offeringTree = useOfferingTree(canRead && canReadCatalogue);
   const offerings = useMemo(() => pickerOfferings(offeringTree.data), [offeringTree.data]);
@@ -97,6 +115,8 @@ export function PricingPage() {
   const [bulkInput, setBulkInput] = useState("");
   const bulk = useBulkUpdatePrices();
   const changes = pendingChanges(edits);
+  const creates = pendingCreates(edits);
+  const changeCount = changes.length + creates.length;
   const invalid = editErrors(edits);
 
   // Debounced server-side search
@@ -107,42 +127,64 @@ export function PricingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
 
+  // A card priced elsewhere (the drawer, another admin) leaves the "Not priced" list: drop its edit
+  useEffect(() => {
+    if (!awaiting.data) return;
+    const live = new Set(awaiting.data.map(awaitingKey));
+    const gone = (key: string) => key.startsWith("new:") && !live.has(key);
+    setSelected((current) => ([...current].some(gone) ? new Set([...current].filter((key) => !gone(key))) : current));
+    setEdits((current) =>
+      Object.keys(current).some(gone) ? Object.fromEntries(Object.entries(current).filter(([key]) => !gone(key))) : current,
+    );
+  }, [awaiting.data]);
+
   // Leaving with unsaved price edits asks first. (The App Router has no in-app navigation guard.)
   useEffect(() => {
-    if (!changes.length) return;
+    if (!changeCount) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [changes.length]);
+  }, [changeCount]);
 
   if (!canRead) return <PanelMessage>You don&apos;t have permission to view pricing.</PanelMessage>;
 
   const rows = rules.data?.rules ?? [];
+  const rootName = filters.categoryId ? (roots.find((c) => c.id === filters.categoryId)?.name ?? null) : undefined;
+  const newRows = visibleAwaiting(awaiting.data ?? [], { page: filters.page, status, q: filters.q, category: rootName });
+  const awaitingTotal = awaiting.data?.length ?? 0;
   const rates = new Set(rows.map((r) => r.amounts.gstRateBps));
   const gstHeader = rates.size === 1 ? `GST ${formatBps([...rates][0])}` : "GST";
   const bulkMode = selected.size > 0;
 
-  const toggleRow = (rule: PriceRule, on: boolean) => {
-    const next = new Set(selected);
-    if (on) {
-      next.add(rule.id);
-      setEdits((e) =>
-        setEdit(e, rule.id, {
-          input: formatPaise(rule.amounts.sessionPricePaise),
-          originalPaise: rule.amounts.sessionPricePaise,
-          revision: rule.revision,
-        }),
-      );
-    } else {
-      next.delete(rule.id);
-      setEdits((e) => dropEdit(e, rule.id));
-      setRowErrors(({ [rule.id]: _, ...rest }) => rest);
+  /** Selecting a row makes its price editable; a "Not priced" row starts empty. */
+  const toggleKey = (key: string, start: PriceEdit, on: boolean) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+    if (on) setEdits((e) => setEdit(e, key, start));
+    else {
+      setEdits((e) => dropEdit(e, key));
+      setRowErrors(({ [key]: _, ...rest }) => rest);
     }
-    setSelected(next);
   };
+  const toggleRow = (rule: PriceRule, on: boolean) =>
+    toggleKey(
+      rule.id,
+      { input: formatPaise(rule.amounts.sessionPricePaise), originalPaise: rule.amounts.sessionPricePaise, revision: rule.revision },
+      on,
+    );
+  const toggleNew = (card: AwaitingPrice, on: boolean) =>
+    toggleKey(
+      awaitingKey(card),
+      { input: "", originalPaise: null, revision: 0, create: { curriculumId: card.curriculumId, facultyId: card.facultyId } },
+      on,
+    );
   const clearSelection = () => {
     setSelected(new Set());
     setEdits({});
@@ -155,6 +197,15 @@ export function PricingPage() {
     if (!selected.has(rule.id)) toggleRow(rule, true);
     setFocusId(rule.id);
   };
+  const editNewPrice = (card: AwaitingPrice) => {
+    const key = awaitingKey(card);
+    if (!selected.has(key)) toggleNew(card, true);
+    setFocusId(key);
+  };
+  const setInput = (key: string, input: string) => {
+    setEdits((e) => (e[key] ? setEdit(e, key, { ...e[key], input }) : e));
+    setRowErrors(({ [key]: _, ...rest }) => rest);
+  };
   const bulkParsed = parseRupeesToPaise(bulkInput);
   const bulkError = bulkInput.trim() && !bulkParsed.ok ? bulkParsed.error : bulkParsed.ok && bulkParsed.paise <= 0 ? "The price must be more than zero" : undefined;
   /** "Set selected to": the same amount on every selected row, still unsaved. */
@@ -164,8 +215,13 @@ export function PricingPage() {
     setEdits((e) => Object.fromEntries(Object.entries(e).map(([id, edit]) => [id, { ...edit, input }])));
     setRowErrors({});
   };
-  const requestClear = () => (changes.length ? setConfirmClear(true) : clearSelection());
-  const allOnPage = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  const requestClear = () => (changeCount ? setConfirmClear(true) : clearSelection());
+  const pageKeys = [...newRows.map(awaitingKey), ...rows.map((r) => r.id)];
+  const allOnPage = pageKeys.length > 0 && pageKeys.every((key) => selected.has(key));
+  const selectPage = (on: boolean) => {
+    newRows.forEach((card) => selected.has(awaitingKey(card)) !== on && toggleNew(card, on));
+    rows.forEach((r) => selected.has(r.id) !== on && toggleRow(r, on));
+  };
 
   const save = async () => {
     if (Object.keys(invalid).length) {
@@ -173,13 +229,13 @@ export function PricingPage() {
       return;
     }
     try {
-      const saved = await bulk.mutateAsync(changes);
+      const saved = await bulk.mutateAsync({ changes, creates: creates.map(({ key: _, ...create }) => create) });
       toast.success(`${saved.length} price change${saved.length === 1 ? "" : "s"} saved`);
       clearSelection();
     } catch (error) {
       // All or nothing: keep every edit and point at the rejected rows
       const described = describeApiError(error, "change prices");
-      setRowErrors(bulkRowErrors(described.fields, changes));
+      setRowErrors(bulkRowErrors(described.fields, changes, creates));
       toast.error(described.message);
     }
   };
@@ -194,14 +250,16 @@ export function PricingPage() {
     <div className="flex flex-col gap-6 pb-20">
       <PageHeader
         title="Pricing"
-        description={
-          rules.data?.meta
-            ? `Session pricing by tutor and category · ${rules.data.meta.total.toLocaleString("en-IN")} pricing rule${rules.data.meta.total === 1 ? "" : "s"}`
-            : "Session pricing by tutor and category"
-        }
+        description={[
+          "Session pricing by tutor and category",
+          rules.data?.meta &&
+            `${rules.data.meta.total.toLocaleString("en-IN")} pricing rule${rules.data.meta.total === 1 ? "" : "s"}`,
+          awaitingTotal > 0 && `${awaitingTotal.toLocaleString("en-IN")} not priced`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         actions={addButton}
       />
-      <AwaitingPrices canManage={canManage} onSetPrice={(preset) => setDrawer({ preset })} />
       {canReadCatalogue && <ResolutionPanel offerings={offerings} />}
       <Card className="overflow-hidden">
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
@@ -210,7 +268,9 @@ export function PricingPage() {
             <CardDescription>
               {bulkMode
                 ? `Editing ${selected.size} selected rule${selected.size === 1 ? "" : "s"} — GST and student total recalculate on save`
-                : "Select rules or click a session price to edit it. Student pays the session price plus GST."}
+                : newRows.length
+                  ? "Rows marked Not priced are tutors' subject cards without a price; the tutor can sign in once each has one. Select rows or click a session price to edit it."
+                  : "Select rules or click a session price to edit it. Student pays the session price plus GST."}
             </CardDescription>
           </div>
           {bulkMode && (
@@ -281,7 +341,7 @@ export function PricingPage() {
           <PanelMessage onRetry={() => void rules.refetch()}>
             Price rules could not be loaded. {describeApiError(rules.error, "view pricing").message}
           </PanelMessage>
-        ) : rows.length === 0 ? (
+        ) : rows.length === 0 && newRows.length === 0 ? (
           <div className="flex flex-col items-start gap-3 px-6 pb-6">
             <p className="text-sm">
               {filters.q || filters.categoryId ? "No price rules match these filters." : "No price rules yet."}
@@ -299,9 +359,7 @@ export function PricingPage() {
                       <Checkbox
                         aria-label="Select every rule on this page"
                         checked={allOnPage}
-                        onCheckedChange={(checked) =>
-                          rows.forEach((r) => selected.has(r.id) !== (checked === true) && toggleRow(r, checked === true))
-                        }
+                        onCheckedChange={(checked) => selectPage(checked === true)}
                       />
                     </TableHead>
                   )}
@@ -318,6 +376,24 @@ export function PricingPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {newRows.map((card) => {
+                  const key = awaitingKey(card);
+                  return (
+                    <NewPriceRow
+                      key={key}
+                      card={card}
+                      canManage={canManage}
+                      selected={selected.has(key)}
+                      edit={edits[key]}
+                      error={rowErrors[key]}
+                      focus={focusId === key}
+                      onToggle={(on) => toggleNew(card, on)}
+                      onEditPrice={() => editNewPrice(card)}
+                      onInput={(input) => setInput(key, input)}
+                      onSetPrice={() => setDrawer({ preset: presetFor(card) })}
+                    />
+                  );
+                })}
                 {rows.map((rule) => (
                   <PriceRow
                     key={rule.id}
@@ -329,10 +405,7 @@ export function PricingPage() {
                     onToggle={(on) => toggleRow(rule, on)}
                     focus={focusId === rule.id}
                     onEditPrice={() => editPrice(rule)}
-                    onInput={(input) => {
-                      setEdits((e) => setEdit(e, rule.id, { ...e[rule.id], input }));
-                      setRowErrors(({ [rule.id]: _, ...rest }) => rest);
-                    }}
+                    onInput={(input) => setInput(rule.id, input)}
                     onEdit={() => setDrawer({ rule })}
                     onDeactivate={() => setDeactivating(rule)}
                   />
@@ -355,7 +428,7 @@ export function PricingPage() {
             aria-label="Unsaved price changes"
           >
             <p className="text-sm text-accent-foreground">
-              {changes.length} price change{changes.length === 1 ? "" : "s"} not saved · GST and student totals recalculate on save
+              {changeCount} price change{changeCount === 1 ? "" : "s"} not saved · GST and student totals recalculate on save
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -363,18 +436,21 @@ export function PricingPage() {
                 onClick={() => {
                   setEdits((e) =>
                     Object.fromEntries(
-                      Object.entries(e).map(([id, edit]) => [id, { ...edit, input: formatPaise(edit.originalPaise) }]),
+                      Object.entries(e).map(([id, edit]) => [
+                        id,
+                        { ...edit, input: edit.originalPaise === null ? "" : formatPaise(edit.originalPaise) },
+                      ]),
                     ),
                   );
                   setRowErrors({});
                   setBulkInput("");
                 }}
-                disabled={!changes.length || bulk.isPending}
+                disabled={!changeCount || bulk.isPending}
               >
                 Discard
               </Button>
-              <Button onClick={save} disabled={!changes.length || bulk.isPending}>
-                {bulk.isPending ? "Saving…" : `Save ${changes.length} change${changes.length === 1 ? "" : "s"}`}
+              <Button onClick={save} disabled={!changeCount || bulk.isPending}>
+                {bulk.isPending ? "Saving…" : `Save ${changeCount} change${changeCount === 1 ? "" : "s"}`}
               </Button>
             </div>
           </div>
@@ -393,7 +469,7 @@ export function PricingPage() {
       <ConfirmDialog
         open={confirmClear}
         title="Discard price changes?"
-        description={`${changes.length} price change${changes.length === 1 ? " has" : "s have"} not been saved.`}
+        description={`${changeCount} price change${changeCount === 1 ? " has" : "s have"} not been saved.`}
         confirmLabel="Discard"
         destructive
         onCancel={() => setConfirmClear(false)}
@@ -422,7 +498,7 @@ function PriceRow({
   rule: PriceRule;
   canManage: boolean;
   selected: boolean;
-  edit?: { input: string; originalPaise: number };
+  edit?: { input: string; originalPaise: number | null };
   error?: string;
   onToggle: (on: boolean) => void;
   onInput: (value: string) => void;
@@ -510,12 +586,120 @@ function PriceRow({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onEdit}>Edit</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onEdit}>Edit price</DropdownMenuItem>
               {rule.isActive && (
                 <DropdownMenuItem variant="destructive" onSelect={onDeactivate}>
                   Deactivate
                 </DropdownMenuItem>
               )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      )}
+    </TableRow>
+  );
+}
+
+/**
+ * A tutor's subject card with no tutor price yet: highlighted, with a "Not priced" badge.
+ * Selected like any rule; the amount typed here creates the tutor price on save.
+ */
+function NewPriceRow({
+  card,
+  canManage,
+  selected,
+  edit,
+  error,
+  focus,
+  onToggle,
+  onEditPrice,
+  onInput,
+  onSetPrice,
+}: {
+  card: AwaitingPrice;
+  canManage: boolean;
+  selected: boolean;
+  edit?: { input: string };
+  error?: string;
+  focus: boolean;
+  onToggle: (on: boolean) => void;
+  onEditPrice: () => void;
+  onInput: (value: string) => void;
+  onSetPrice: () => void;
+}) {
+  const parsed = edit?.input.trim() ? parseRupeesToPaise(edit.input) : undefined;
+  const preview = parsed?.ok && parsed.paise > 0 ? previewStudentPays(parsed.paise, card.defaultPrice?.gstRateBps ?? DEFAULT_GST_BPS) : null;
+  const name = `${card.facultyName}, ${card.subject}`;
+  const suggestion = card.defaultPrice ? `Default ${formatPaise(card.defaultPrice.sessionPricePaise)}` : undefined;
+  return (
+    <TableRow
+      data-state={selected ? "selected" : undefined}
+      className={cn(
+        "bg-warning-subtle/40 hover:bg-warning-subtle/60",
+        selected && "bg-accent data-[state=selected]:bg-accent hover:bg-accent",
+        error && "bg-error-subtle",
+      )}
+    >
+      {canManage && (
+        <TableCell className="border-l-2 border-l-warning-border">
+          <Checkbox aria-label={`Select ${name}`} checked={selected} onCheckedChange={(checked) => onToggle(checked === true)} />
+        </TableCell>
+      )}
+      <TableCell className={cn("font-medium", !canManage && "border-l-2 border-l-warning-border")}>
+        <span title={card.facultyEmail}>{card.facultyName}</span>
+        <Badge variant="warning" className="ml-2">
+          Not priced
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <div className="flex min-w-0 flex-col">
+          <span className="font-medium">{card.subject}</span>
+          <span className="truncate text-xs text-muted-foreground" title={card.pathLabel}>
+            {card.pathLabel}
+          </span>
+        </div>
+      </TableCell>
+      <TableCell className="text-right">
+        {selected && edit ? (
+          <TextField
+            label={`Session price for ${name}`}
+            labelHidden
+            inputMode="decimal"
+            placeholder={card.defaultPrice ? formatPaise(card.defaultPrice.sessionPricePaise) : "₹"}
+            value={edit.input}
+            autoFocus={focus}
+            onChange={(e) => onInput(e.target.value)}
+            onBlur={() => parsed?.ok && parsed.paise > 0 && onInput(formatPaise(parsed.paise))}
+            error={error}
+            containerClassName="ml-auto w-28"
+            className="text-right font-semibold"
+          />
+        ) : canManage ? (
+          <button
+            type="button"
+            onClick={onEditPrice}
+            title={suggestion}
+            aria-label={`Set session price for ${name}${suggestion ? `, ${suggestion.toLowerCase()}` : ""}`}
+            className="ml-auto flex h-9 w-28 items-center justify-end rounded-md border border-dashed border-warning-border bg-card px-3 text-sm text-muted-foreground hover:border-primary focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            Set price
+          </button>
+        ) : (
+          <span className="text-muted-foreground">Not set</span>
+        )}
+      </TableCell>
+      <TableCell className="text-right text-muted-foreground">{preview ? formatPaise(preview.gstPaise) : "—"}</TableCell>
+      <TableCell className="text-right text-muted-foreground">{preview ? formatPaise(preview.studentPaysPaise) : "—"}</TableCell>
+      {canManage && (
+        <TableCell className="w-12">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${name}`}>
+                <MoreHorizontalIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onSetPrice}>Set price</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
