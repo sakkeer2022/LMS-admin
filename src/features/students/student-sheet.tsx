@@ -16,7 +16,11 @@ import { usePermission } from "@/components/security/permission-provider";
 import { ApiError } from "@/lib/api/contracts";
 import { useDownloadConsent, useStudent } from "./api";
 import { ConsentBadge, formatDate } from "./students-page";
-import { RELATIONSHIP_LABELS } from "./types";
+import {
+  EDUCATION_LEVEL_LABELS,
+  RELATIONSHIP_LABELS,
+  referralText,
+} from "./types";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -149,6 +153,41 @@ export function StudentSheet({
                     </Fact>
                   </dl>
                 )}
+              </Section>
+
+              <Section title="Education">
+                {student.education ? (
+                  <dl className="flex flex-col gap-2">
+                    {student.education.level && (
+                      <Fact label="Currently">
+                        {EDUCATION_LEVEL_LABELS[student.education.level] ??
+                          student.education.level}
+                      </Fact>
+                    )}
+                    {student.education.institutionName && (
+                      <Fact label="School or college">
+                        {student.education.institutionName}
+                      </Fact>
+                    )}
+                    {student.education.detail && (
+                      <Fact label="Class or course">
+                        {student.education.detail}
+                      </Fact>
+                    )}
+                  </dl>
+                ) : (
+                  <p className="text-sm text-text-secondary">Not provided.</p>
+                )}
+              </Section>
+
+              <Section title="How they found Amentorz">
+                <p className="text-sm">
+                  {student.referral ? (
+                    referralText(student.referral)
+                  ) : (
+                    <span className="text-text-secondary">Not provided.</span>
+                  )}
+                </p>
               </Section>
 
               <Section title="Parent or guardian">
