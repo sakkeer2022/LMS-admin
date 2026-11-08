@@ -39,6 +39,14 @@ export interface ConsentRecord {
 }
 
 export interface AdminStudentDetail extends AdminStudent {
+  /** How the student heard about Amentorz (optional at registration) */
+  referral: { code: string; name: string; other: string | null } | null;
+  /** Optional education details; any field may be missing */
+  education: {
+    level: string | null;
+    institutionName: string | null;
+    detail: string | null;
+  } | null;
   learningProfile: {
     teachingLanguage: string | null;
     /** One per chosen offering, any mix of branches */
@@ -66,6 +74,19 @@ export const CONSENT_LABELS: Record<ConsentStatus, string> = {
   missing: "Missing",
   not_required: "Not required",
 };
+
+export const EDUCATION_LEVEL_LABELS: Record<string, string> = {
+  school: "School",
+  undergraduate: "Undergraduate",
+  postgraduate: "Postgraduate",
+  working: "Working professional",
+  other: "Other",
+};
+
+/** "Other: a poster at my tuition centre" for the free-text option, otherwise the option's name. */
+export function referralText(referral: NonNullable<AdminStudentDetail["referral"]>) {
+  return referral.other ? `${referral.name}: ${referral.other}` : referral.name;
+}
 
 export const RELATIONSHIP_LABELS: Record<string, string> = {
   father: "Father",

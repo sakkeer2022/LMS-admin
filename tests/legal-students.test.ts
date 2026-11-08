@@ -5,7 +5,7 @@ import {
   REAUTH_REQUIRED_MESSAGE,
 } from "../src/lib/api/reauth";
 import { MAX_POLICY_BYTES, uploadSchema } from "../src/features/legal/schema";
-import { toQuery } from "../src/features/students/types";
+import { referralText, toQuery } from "../src/features/students/types";
 
 describe("re-authentication detection", () => {
   it("recognises only the backend's 403 for a stale confirmation", () => {
@@ -87,5 +87,16 @@ describe("student list query", () => {
     ).toBe("?page=1&limit=20&q=Ananya%20Sharma");
     expect(toQuery({ q: "a+b@x.org" })).toBe("?q=a%2Bb%40x.org");
     expect(toQuery({})).toBe("");
+  });
+});
+
+describe("student referral text", () => {
+  it("shows the option name, with the student's own words for Other", () => {
+    expect(referralText({ code: "instagram", name: "Instagram", other: null })).toBe(
+      "Instagram",
+    );
+    expect(
+      referralText({ code: "other", name: "Other", other: "A poster at my tuition centre" }),
+    ).toBe("Other: A poster at my tuition centre");
   });
 });
