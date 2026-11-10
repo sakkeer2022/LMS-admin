@@ -12,6 +12,8 @@ import {
 import { Switch } from '../src/components/shadcn/switch';
 import { CategoryTreeList } from '../src/features/category-tree/components/category-tree-list';
 import { PermissionProvider } from '../src/components/security/permission-provider';
+import { leafSubjectSchema } from '../src/lib/api/category-tree';
+import { pickerOfferings } from '../src/lib/api/offering-tree';
 import { CategoryDetailView, CategoryForm } from '../src/features/category-tree/components/category-detail-panel';
 import { CategoryTreePage } from '../src/features/category-tree/components/category-tree-page';
 
@@ -259,5 +261,30 @@ describe('category tree page', () => {
 
   it('refuses without catalogue.read', () => {
     expect(wrap(<CategoryTreePage />, [])).toContain('permission to view the catalogue');
+  });
+});
+
+describe('Leaf subjects', () => {
+  it('parses a leaf subject with its usage', () => {
+    const live = { curriculumId: 'c1', subjectId: 's1', name: 'Physics', isActive: true, subjectActive: true, tutors: 2, prices: 1, learners: 0 };
+    expect(leafSubjectSchema.parse(live).tutors).toBe(2);
+  });
+
+  it('labels a picker offering by the leaf path and the subject', () => {
+    const tree = {
+      nodes: [
+        { id: 'a', parentId: null, name: 'School', isLeaf: false },
+        { id: 'b', parentId: 'a', name: 'Class 11', isLeaf: true },
+      ],
+      offerings: [{ curriculumId: 'c1', categoryId: 'b', board: null, level: null, subject: { id: 's1', name: 'Physics' } }],
+    };
+    expect(pickerOfferings(tree)[0]).toMatchObject({ label: 'School › Class 11 › Physics', subject: 'Physics' });
+  });
+
+  it('shows the Subjects section on a leaf and not on a branch', () => {
+    const view = (n: CategoryNode) => wrap(<CategoryDetailView detail={{ ...liveDetail, ...n }} node={n} canManage pending={false}
+      onAddChild={() => {}} onEdit={() => {}} onDelete={() => {}} onToggleActive={() => {}} />);
+    expect(view(university)).toContain('Subjects');
+    expect(view(school)).not.toContain('Subjects');
   });
 });

@@ -14,8 +14,8 @@ export function chosenOffering(offerings: readonly PickerOffering[], choice: Off
 }
 
 /**
- * The category (a leaf of the category tree, shown with its path). Each leaf has one
- * offering, so choosing the category chooses the offering too.
+ * A subject of a leaf of the category tree, shown with the leaf's path. Each option is
+ * one offering, so choosing it chooses the category and the curriculum.
  */
 export function OfferingPicker({
   offerings,
@@ -30,7 +30,7 @@ export function OfferingPicker({
 }) {
   return (
     <SelectField
-      label="Category"
+      label="Category and subject"
       value={value.curriculumId}
       required
       error={errors.categoryId ?? errors.curriculumId}
@@ -39,7 +39,7 @@ export function OfferingPicker({
         onChange(offering ? { categoryId: offering.categoryId, curriculumId: offering.curriculumId } : emptyChoice);
       }}
     >
-      <option value="">Select category</option>
+      <option value="">Select subject</option>
       {offerings.map((o) => (
         <option key={o.curriculumId} value={o.curriculumId}>
           {o.label}

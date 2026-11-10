@@ -11,6 +11,7 @@ import { Switch } from '@/components/shadcn/switch';
 import { describeApiError } from '@/lib/api/errors';
 import { useCategoryDetail, useCreateCategory, useUpdateCategory, type CategoryDetail, type CategoryNode } from '@/lib/api/category-tree';
 import { addChildBlockedReason, breadcrumb, uniqueSiblingCode } from '@/lib/api/category-tree-model';
+import { LeafSubjects } from './leaf-subjects';
 
 const dateFormat = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'Asia/Kolkata' });
 
@@ -92,6 +93,8 @@ export function CategoryDetailView({ detail, node, canManage, pending, onAddChil
       </dl>
       {!node.isActive && <p className="text-xs text-muted-foreground">Hidden from tutors and learners, with everything below it.</p>}
     </div>
+
+    {isLeaf && <LeafSubjects categoryId={node.id} canManage={canManage} />}
 
     <div className="flex flex-col gap-4 border-t p-5">
       <div className="flex flex-col gap-1 rounded-md border px-4 py-4">

@@ -56,27 +56,27 @@ const tree = offeringTreeSchema.parse({
     { id: 'p12', parentId: 'p', name: 'Class 12', isLeaf: true },
     { id: 'u', parentId: null, name: 'University', isLeaf: true },
   ],
-  // One category curriculum per leaf: the subject is the leaf, board and level are null
+  // One offering per subject of a leaf; board and level are null
   offerings: [
-    { curriculumId: 'c12', categoryId: 'p12', board: null, level: null, subject: { id: 'p12', name: 'Class 12' } },
-    { curriculumId: 'c11', categoryId: 'p11', board: null, level: null, subject: { id: 'p11', name: 'Class 11' } },
-    { curriculumId: 'cu', categoryId: 'u', board: null, level: null, subject: { id: 'u', name: 'University' } },
+    { curriculumId: 'c12', categoryId: 'p12', board: null, level: null, subject: { id: 'sp', name: 'Physics' } },
+    { curriculumId: 'c11', categoryId: 'p11', board: null, level: null, subject: { id: 'sp', name: 'Physics' } },
+    { curriculumId: 'cu', categoryId: 'u', board: null, level: null, subject: { id: 'sm', name: 'Mathematics' } },
   ],
 });
 
 describe('offering picker (GET /admin/category-tree/picker)', () => {
-  it('labels each leaf with its full path and sorts by path', () => {
+  it('labels each subject with its leaf path and sorts by path', () => {
     const offerings = pickerOfferings(tree);
     expect(offerings.map((o) => [o.curriculumId, o.label])).toEqual([
-      ['c11', 'School › K-12 › Physics › Class 11'],
-      ['c12', 'School › K-12 › Physics › Class 12'],
-      ['cu', 'University'],
+      ['c11', 'School › K-12 › Physics › Class 11 › Physics'],
+      ['c12', 'School › K-12 › Physics › Class 12 › Physics'],
+      ['cu', 'University › Mathematics'],
     ]);
     expect(pickerOfferings(undefined)).toEqual([]);
   });
   it('finds the offering only for a complete, matching choice', () => {
     const offerings = pickerOfferings(tree);
-    expect(chosenOffering(offerings, { categoryId: 'p11', curriculumId: 'c11' })?.subject).toBe('Class 11');
+    expect(chosenOffering(offerings, { categoryId: 'p11', curriculumId: 'c11' })?.subject).toBe('Physics');
     expect(chosenOffering(offerings, { categoryId: 'u', curriculumId: 'c11' })).toBeUndefined();
     expect(chosenOffering(offerings, { categoryId: 'p11', curriculumId: '' })).toBeUndefined();
   });
