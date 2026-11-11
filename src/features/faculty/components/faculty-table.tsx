@@ -12,15 +12,23 @@ import {
 } from "@/components/shadcn/dropdown-menu";
 import {
   STATUS_META,
+  VERIFICATION_META,
   documentsLabel,
   formatShortDate,
   pricingMeta,
   subjectsLabel,
   tutorDetail,
 } from "../schemas/faculty";
-import type { FacultyListItem, FacultyRowAction, FacultyRowStatus, PricingStatus } from "../types/faculty";
+import type { FacultyListItem, FacultyRowAction, FacultyRowStatus, PricingStatus, VerificationStatus } from "../types/faculty";
 
-export const FACULTY_TABLE_HEADERS = ["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Status", ""];
+export const FACULTY_TABLE_HEADERS = ["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Verification", "Status", ""];
+
+/** New, Approved, Rejected or Requested for re-upload; nothing for invitations. */
+export function VerificationBadge({ status }: { status: VerificationStatus | null }) {
+  if (!status) return <span className="text-muted-foreground">—</span>;
+  const meta = VERIFICATION_META[status];
+  return <Badge variant={meta.variant}>{meta.label}</Badge>;
+}
 
 export function FacultyStatusBadge({ status }: { status: FacultyRowStatus }) {
   const meta = STATUS_META[status];
@@ -45,7 +53,10 @@ export interface RowAction {
   disabled?: boolean;
 }
 
-/** Row actions. View opens the verification drawer; the rest wait for their tickets. */
+/**
+ * Row actions. View opens the verification drawer; Activate / Deactivate is the operational switch, kept
+ * apart from verification; the rest wait for their tickets.
+ */
 export function rowActions(row: FacultyListItem, onAction: (action: FacultyRowAction, row: FacultyListItem) => void): RowAction[] {
   const item = (id: FacultyRowAction, label: string, extra: Partial<RowAction> = {}): RowAction => ({
     id,
@@ -62,7 +73,7 @@ export function rowActions(row: FacultyListItem, onAction: (action: FacultyRowAc
   return [
     item("view", row.status === "pending" ? "Review application" : "View profile"),
     item("edit", "Edit"),
-    item("suspend", "Suspend", { disabled: row.status === "suspended" }),
+    row.isActive === false ? item("activate", "Activate") : item("deactivate", "Deactivate"),
     item("delete", "Delete", { destructive: true }),
   ];
 }
@@ -128,6 +139,11 @@ export function facultyColumns(
       id: "applied",
       header: "Applied",
       cell: ({ row }) => <span className="text-text-secondary">{formatShortDate(row.original.appliedAt, now)}</span>,
+    },
+    {
+      id: "verification",
+      header: "Verification",
+      cell: ({ row }) => <VerificationBadge status={row.original.verification} />,
     },
     {
       id: "status",

@@ -21,7 +21,8 @@ import {
 } from "@/components/shadcn/dropdown-menu";
 import { describeApiError } from "@/lib/api/errors";
 import { useCategoryTree } from "@/lib/api/category-tree";
-import { useFacultyCounts, useFacultyRoster } from "../api/faculty";
+import { ConfirmDialog } from "@/components/forms/confirm-dialog";
+import { useFacultyCounts, useFacultyRoster, useSetFacultyActive } from "../api/faculty";
 import { PAGE_SIZE, SORT_LABELS, TAB_LABELS, filtersFromParams, headerSummary, rangeLabel } from "../schemas/faculty";
 import {
   FACULTY_SORTS,
@@ -37,9 +38,8 @@ import { FacultyTable } from "./faculty-table";
 import { InviteTutorsModal } from "./invite-tutors-modal";
 
 /** Placeholder handlers for the row menu until each action's ticket lands. */
-const ACTION_TICKETS: Record<Exclude<FacultyRowAction, "view">, string> = {
+const ACTION_TICKETS: Record<Exclude<FacultyRowAction, "view" | "activate" | "deactivate">, string> = {
   edit: "Profile editing arrives with LMS-82.",
-  suspend: "Suspending tutors arrives with LMS-88.",
   delete: "Removing tutors is not in Phase 1 scope yet.",
   resend: "Resending invitations arrives with LMS-80.",
   revoke: "Revoking invitations arrives with LMS-80.",
@@ -63,6 +63,27 @@ export function FacultyPage() {
   const filters = useMemo(() => filtersFromParams(new URLSearchParams(params.toString())), [params]);
   const reviewing = params.get("tutor") ?? undefined;
   const [inviteOpen, setInviteOpen] = useState(false);
+  const canApprove = usePermission("faculty.approve");
+  const setActive = useSetFacultyActive();
+  const [deactivating, setDeactivating] = useState<FacultyListItem>();
+
+  function changeActive(row: FacultyListItem, isActive: boolean) {
+    const name = row.fullName ?? row.email;
+    setActive.mutate(
+      { facultyId: row.id, isActive },
+      {
+        onSuccess: () => {
+          setDeactivating(undefined);
+          toast.success(isActive ? `${name} is active` : `${name} is inactive`, {
+            description: isActive
+              ? "They can sign in again once verified and priced."
+              : "They cannot sign in and are hidden from students. Their verification is unchanged.",
+          });
+        },
+        onError: (err) => toast.error(describeApiError(err, "change tutor status").message),
+      },
+    );
+  }
 
   const roster = useFacultyRoster(filters, canRead);
   const counts = useFacultyCounts({ categoryId: filters.categoryId, search: filters.search }, canRead);
@@ -87,6 +108,10 @@ export function FacultyPage() {
 
   function onAction(action: FacultyRowAction, row: FacultyListItem) {
     if (action === "view") return update({ tutor: row.id });
+    if (action === "activate" || action === "deactivate") {
+      if (!canApprove) return toast.error("You need the faculty.approve permission to change a tutor's status.");
+      return action === "activate" ? changeActive(row, true) : setDeactivating(row);
+    }
     toast.info(`${row.fullName ?? row.email}: coming soon`, { description: ACTION_TICKETS[action] });
   }
 
@@ -205,6 +230,16 @@ export function FacultyPage() {
         </Card>
       </FacultyStatusTabs>
 
+      <ConfirmDialog
+        open={Boolean(deactivating)}
+        title={`Deactivate ${deactivating?.fullName ?? deactivating?.email ?? "tutor"}?`}
+        description="They will not be able to sign in and are hidden from students. Their verification status and documents are kept; you can activate them again at any time."
+        confirmLabel="Deactivate"
+        destructive
+        pending={setActive.isPending}
+        onCancel={() => setDeactivating(undefined)}
+        onConfirm={() => deactivating && changeActive(deactivating, false)}
+      />
       {canInvite && <InviteTutorsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />}
       <FacultyReviewDrawer facultyId={reviewing} onClose={() => update({ tutor: undefined })} />
     </div>

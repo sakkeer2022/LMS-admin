@@ -8,6 +8,7 @@ import {
   SettingEmpty,
   SettingForm,
   SettingInput,
+  SettingPhoneInput,
   SettingPill,
   SettingPills,
   SettingRow,
@@ -26,6 +27,7 @@ import {
 } from "@/features/auth/api/auth";
 import { ApiError } from "@/lib/api/contracts";
 import { permissionsOf } from "@/lib/auth/access";
+import { useServedCountries } from "@/lib/regions";
 import { describeDevice } from "@/lib/auth/device";
 import { ChangePasswordDialog } from "./change-password-dialog";
 import { ACTIVITY_LABELS, WARNING_ACTIONS } from "./labels";
@@ -101,6 +103,7 @@ function DetailsCard() {
     (k) => values[k] !== initial[k],
   );
   const zones = useMemo(() => zoneNames(user.timezone), [user.timezone]);
+  const countries = useServedCountries();
 
   useEffect(() => {
     if (dirty) setSaved(false);
@@ -180,16 +183,13 @@ function DetailsCard() {
         <SettingRow
           label="Mobile number"
           htmlFor="mobileNumber"
-          description="International format, including the country code. Optional."
+          description="Choose the country code, then enter the number. Optional."
         >
-          <SettingInput
+          <SettingPhoneInput
             id="mobileNumber"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="+919876543210"
+            countries={countries}
             value={values.mobileNumber ?? ""}
-            onChange={(e) => set("mobileNumber")(e.target.value)}
+            onChange={(mobileNumber) => set("mobileNumber")(mobileNumber)}
             error={errors.mobileNumber}
           />
         </SettingRow>

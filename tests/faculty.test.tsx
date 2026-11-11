@@ -53,9 +53,11 @@ const profile: FacultyListItem = {
   fullName: "Anjali Deshpande",
   email: "anjali.deshpande@gmail.com",
   status: "pending",
+  verification: "new",
+  isActive: true,
   subjects: ["Physics", "Chemistry"],
   qualification: "Ph.D. · IIT Bombay",
-  documents: { uploaded: 4, required: 4 },
+  documents: { uploaded: 4, required: 4, additional: 0 },
   pricing: "none",
   appliedAt: "2026-08-28T09:00:00Z",
   invitation: null,
@@ -67,6 +69,8 @@ const invitation: FacultyListItem = {
   fullName: null,
   email: "ananya.iyer@gmail.com",
   status: "invited",
+  verification: null,
+  isActive: null,
   subjects: [],
   qualification: null,
   documents: null,
@@ -246,17 +250,19 @@ describe("row presentation", () => {
 });
 
 describe("row actions", () => {
-  it("offers view, edit, suspend and delete for profiles and calls the handler", () => {
+  it("offers view, edit, deactivate and delete for profiles and calls the handler", () => {
     const onAction = vi.fn();
     const items = rowActions(profile, onAction);
-    expect(items.map((i) => i.label)).toEqual(["Review application", "Edit", "Suspend", "Delete"]);
+    expect(items.map((i) => i.label)).toEqual(["Review application", "Edit", "Deactivate", "Delete"]);
     expect(rowActions({ ...profile, status: "verified" }, onAction)[0]!.label).toBe("View profile");
     expect(items.find((i) => i.id === "delete")?.destructive).toBe(true);
     items[2]!.onSelect();
-    expect(onAction).toHaveBeenCalledWith("suspend", profile);
+    expect(onAction).toHaveBeenCalledWith("deactivate", profile);
   });
-  it("disables Suspend for a suspended tutor", () => {
-    expect(rowActions({ ...profile, status: "suspended" }, vi.fn()).find((i) => i.id === "suspend")?.disabled).toBe(true);
+  it("offers Activate for an inactive tutor, separate from verification", () => {
+    const items = rowActions({ ...profile, status: "suspended", isActive: false, verification: "approved" }, vi.fn());
+    expect(items.map((i) => i.id)).toContain("activate");
+    expect(items.map((i) => i.id)).not.toContain("deactivate");
   });
   it("offers resend and revoke for invitations", () => {
     expect(rowActions(invitation, vi.fn()).map((i) => i.label)).toEqual(["Resend invitation", "Revoke invitation"]);
@@ -272,7 +278,7 @@ const table = (rows: FacultyListItem[]) =>
 describe("rendering", () => {
   it("renders a profile row with every column and an accessible action menu", () => {
     const html = table([profile]);
-    for (const text of ["Anjali Deshpande", "anjali.deshpande@gmail.com", "Physics · Chemistry", "Ph.D. · IIT Bombay", "4 of 4", "28 Aug", "Pending"])
+    for (const text of ["Anjali Deshpande", "anjali.deshpande@gmail.com", "Physics · Chemistry", "Ph.D. · IIT Bombay", "4 of 4", "28 Aug", "New", "Pending"])
       expect(html).toContain(text);
     expect(html).toContain('aria-label="Actions for Anjali Deshpande"');
     expect(html).toContain('aria-haspopup="menu"');
@@ -289,10 +295,10 @@ describe("rendering", () => {
     expect(html).toContain("Price pending");
   });
   it("uses the design's column order", () => {
-    expect(FACULTY_TABLE_HEADERS).toEqual(["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Status", ""]);
+    expect(FACULTY_TABLE_HEADERS).toEqual(["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Verification", "Status", ""]);
     const html = table([profile]);
     const headers = [...html.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => m[1]!.replace(/<[^>]+>/g, ""));
-    expect(headers).toEqual(["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Status", "Actions"]);
+    expect(headers).toEqual(["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Verification", "Status", "Actions"]);
   });
   it.each([
     ["verified", "success", "Verified"],
@@ -340,6 +346,7 @@ const detail: FacultyDetail = {
   appliedAt: "2026-11-04T09:00:00Z",
   submittedAt: "2026-11-04T09:00:00Z",
   status: "pending",
+  verification: "new",
   approvalStatus: "pending",
   isPublished: false,
   isActive: true,
@@ -351,10 +358,12 @@ const detail: FacultyDetail = {
     studiedAt: "University of Pune",
     teachingExperience: { code: "3-5", label: "3–5 years" },
     offersOfflineClasses: true,
+    teachingMode: { code: "hybrid", label: "Hybrid (Both Online & Offline)" },
   },
+  reupload: null,
   documents: [
-    { id: "d1", type: "GOVERNMENT_ID", label: "Photo ID", fileName: "id.pdf", mimeType: "application/pdf", fileSize: 2048, uploadedAt: "2026-11-04T09:00:00Z", isVerified: false, verifiedAt: null, scanStatus: "pending", previewable: true },
-    { id: "d2", type: "PAN_CARD", label: "PAN card", fileName: "pan.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", fileSize: 4096, uploadedAt: "2026-11-04T09:00:00Z", isVerified: true, verifiedAt: "2026-11-04T10:00:00Z", scanStatus: "pending", previewable: false },
+    { id: "d1", type: "GOVERNMENT_ID", label: "Photo ID", fileName: "id.pdf", mimeType: "application/pdf", fileSize: 2048, uploadedAt: "2026-11-04T09:00:00Z", isVerified: false, verifiedAt: null, scanStatus: "pending", previewable: true, required: true },
+    { id: "d2", type: "PAN_CARD", label: "PAN card", fileName: "pan.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", fileSize: 4096, uploadedAt: "2026-11-04T09:00:00Z", isVerified: true, verifiedAt: "2026-11-04T10:00:00Z", scanStatus: "pending", previewable: false, required: true },
   ],
   subjects: [
     { assignmentId: "a1", curriculumId: "c1", subject: "Physics", pathLabel: "Academic › School › K-12 › CBSE › Class 11", sessionPricePaise: null, studentPaysPaise: null },
@@ -362,6 +371,7 @@ const detail: FacultyDetail = {
   ],
   pricing: "none",
   consentDecidedAt: null,
+  consentSigned: false,
 };
 
 function wrap(children: ReactNode, permissions = ["faculty.read", "faculty.approve", "faculty.documents"]) {

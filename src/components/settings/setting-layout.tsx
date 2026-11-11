@@ -1,5 +1,6 @@
 "use client";
 import { Eye, EyeOff } from "lucide-react";
+import { PhoneInput, type PhoneInputProps } from "@/components/forms/phone-input";
 import { forwardRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
@@ -121,6 +122,21 @@ export const SettingInput = forwardRef<
     </div>
   );
 });
+
+/** Phone number with a separate country code (flag and dialling code), styled like SettingInput. */
+export function SettingPhoneInput({ error, ...props }: Omit<PhoneInputProps, "invalid" | "describedBy" | "className"> & { error?: string }) {
+  const errorId = error ? `${props.id}-error` : undefined;
+  return (
+    <div className="min-w-0 flex-1">
+      <PhoneInput {...props} invalid={Boolean(error)} describedBy={errorId} className="text-base font-semibold" />
+      {error && (
+        <p id={errorId} className="mt-1 text-xs text-error-foreground">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 /** A native select styled like the inputs; the profile time-zone list is long and benefits from native search. */
 export function SettingSelect({ className, ...props }: ComponentProps<"select">) {

@@ -119,6 +119,29 @@ export function useReviewFaculty(facultyId: string) {
   );
 }
 
+/** Activate or deactivate a tutor (PUT /admin/faculty/{id}/active), separate from verification. */
+export function useSetFacultyActive() {
+  return useDetailMutation(async ({ facultyId, isActive }: { facultyId: string; isActive: boolean }) =>
+    facultyDetailSchema.parse(
+      (await api<unknown>(`${at(facultyId)}/active`, { method: "PUT", body: JSON.stringify({ isActive }) })).data,
+    ),
+  );
+}
+
+/** The tutor's signature from their latest price acceptance, as a blob URL (PNG). The caller revokes it. */
+export async function fetchSignatureBlob(facultyId: string) {
+  const url = `/api/v1${at(facultyId)}/price-consent/signature`;
+  const get = () => fetch(url, { credentials: "same-origin", cache: "no-store" });
+  let response = await get();
+  if (response.status === 401) {
+    await api<unknown>("/auth/me");
+    response = await get();
+  }
+  if (!response.ok) throw new Error(response.status === 404 ? "No signed agreement yet." : "The signature could not be opened.");
+  const blob = await response.blob();
+  return URL.createObjectURL(new Blob([blob], { type: "image/png" }));
+}
+
 const PREVIEW_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
 
 /**
