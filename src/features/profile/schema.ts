@@ -7,13 +7,14 @@ export const profileSchema = z.object({
     .trim()
     .min(1, "Full name is required")
     .max(150, "Use 150 characters or fewer"),
+  // "+91 9876543210" from the phone field; sent as E.164 ("+919876543210")
   mobileNumber: z
     .string()
-    .trim()
+    .transform((v) => v.replace(/[\s()-]/g, ""))
     .transform((v) => (v === "" ? null : v))
     .refine(
       (v) => v === null || /^\+[1-9][0-9]{7,14}$/.test(v),
-      "Use international format, e.g. +919876543210",
+      "Enter a valid number for the chosen country code",
     ),
   timezone: z.string().transform((v) => (v === "" ? null : v)),
 });
