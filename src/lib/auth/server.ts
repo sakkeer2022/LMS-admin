@@ -9,7 +9,7 @@ import { isAdmin, permissionsOf, sessionUserSchema } from './access';
 export async function requireAdmin() {
   const path = (await headers()).get('x-pathname') ?? '/admin/dashboard';
   const toLogin = `/login?redirect=${encodeURIComponent(path)}`;
-  const token = (await cookies()).get('accessToken')?.value;
+  const token = (await cookies()).get('admin_accessToken')?.value;
   if (!token) redirect(toLogin);
   const response = await fetch(`${process.env.BACKEND_ORIGIN ?? 'http://127.0.0.1:3000'}/api/v1/auth/me`, {
     headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(8000),
