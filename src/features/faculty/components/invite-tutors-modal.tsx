@@ -246,8 +246,8 @@ export function InviteTutorsModal({ open, onClose }: { open: boolean; onClose: (
             )}
 
             <p id={helpId} className="text-xs text-muted-foreground">
-              You can invite multiple tutors at once. They will receive an email with a secure link to complete their
-              profile.
+              You can invite multiple tutors at once: press Enter after each email address to add the next one (pasting
+              a list works too). They will receive an email with a secure link to complete their profile.
             </p>
           </div>
         )}
