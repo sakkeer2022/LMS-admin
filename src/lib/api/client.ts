@@ -1,11 +1,14 @@
 "use client";
 import { ApiError, type ApiEnvelope } from "./contracts";
 const base = "/api/v1";
+// Names this portal to the backend, which scopes its session cookies by it (a shared host shares cookies)
+const portal = "admin";
 let csrf: Promise<string> | undefined;
 let refreshing: Promise<void> | undefined;
 // Cookies are HttpOnly. No token storage in localStorage or JavaScript.
 async function csrfToken() {
   return (csrf ??= fetch(`${base}/auth/csrf-token`, {
+    headers: { "x-portal": portal },
     credentials: "same-origin",
     cache: "no-store",
   })
@@ -24,7 +27,7 @@ async function rotate() {
   const response = await fetch(`${base}/auth/refresh`, {
     method: "POST",
     credentials: "same-origin",
-    headers: { "x-csrf-token": await csrfToken() },
+    headers: { "x-portal": portal, "x-csrf-token": await csrfToken() },
   });
   if (!response.ok)
     throw new ApiError(401, "Your session has expired. Please sign in again.");
@@ -33,6 +36,7 @@ async function sharedRefresh() {
   // Web Locks also serialize refresh across tabs: recheck after acquiring the lock.
   const work = async () => {
     const probe = await fetch(`${base}/auth/me`, {
+      headers: { "x-portal": portal },
       credentials: "same-origin",
       cache: "no-store",
     });
@@ -61,6 +65,7 @@ export async function api<T>(
   if (!/^\/[a-z0-9][a-z0-9/_?=&%.:-]*$/i.test(path) || path.includes(".."))
     throw new Error("Invalid API path");
   const headers = new Headers(init.headers);
+  headers.set("x-portal", portal);
   if (init.body && !(init.body instanceof FormData))
     headers.set("content-type", "application/json");
   if (!["GET", "HEAD", "OPTIONS"].includes(init.method?.toUpperCase() ?? "GET"))
@@ -116,6 +121,7 @@ export async function apiBlob(
     fetch(`${base}${path}`, {
       ...init,
       method: "GET",
+      headers: { ...(init.headers as Record<string, string>), "x-portal": portal },
       credentials: "same-origin",
       cache: "no-store",
     });
