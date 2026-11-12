@@ -218,7 +218,14 @@ export function ReviewView({ detail, onClose }: { detail: FacultyDetail; onClose
         <ul className="grid gap-2 sm:grid-cols-2">
           {detail.subjects.map((s) => (
             <li key={s.assignmentId} className="flex flex-col gap-0.5 rounded-md border p-3">
-              <span className="text-sm font-semibold">{s.subject}</span>
+              <span className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                {s.subject}
+                {s.source === "profile" && s.status !== "approved" && (
+                  <Badge variant={s.status === "rejected" ? "destructive" : "info"}>
+                    {s.status === "rejected" ? "Rejected" : "Pending approval"}
+                  </Badge>
+                )}
+              </span>
               <span className="text-xs break-words text-muted-foreground">{s.pathLabel}</span>
               <span className="pt-1 text-xs">
                 {s.sessionPricePaise === null ? (

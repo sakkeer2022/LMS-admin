@@ -32,6 +32,9 @@ export const priceRuleSchema = z.object({
   levelName: z.string().nullable(),
   /** The category path above it: "Academic › School › K-12 › CBSE › Physics" */
   pathLabel: z.string(),
+  /** The tutor's subject card this price belongs to (null for a default price) and its approval */
+  cardId: z.string().nullable(),
+  cardStatus: z.enum(['pending', 'approved', 'rejected']).nullable(),
   amounts: priceAmountsSchema,
   effectiveFrom: z.string(),
   effectiveTo: z.string().nullable(),
@@ -180,12 +183,30 @@ export function usePriceQuote(items: QuoteRequestItem[]) {
   });
 }
 
+/**
+ * PUT /admin/faculty/{facultyId}/subject-cards/{cardId}/review: approve (needs an active tutor
+ * price) or reject (needs a reason) a card the tutor requested from their profile.
+ */
+export interface SubjectCardDecision {
+  facultyId: string;
+  cardId: string;
+  decision: 'approve' | 'reject';
+  reason?: string;
+}
+export function useReviewSubjectCard() {
+  return usePricingMutation(async ({ facultyId, cardId, ...body }: SubjectCardDecision) =>
+    (await api<unknown>(`/admin/faculty/${encodeURIComponent(facultyId)}/subject-cards/${encodeURIComponent(cardId)}/review`, send('PUT', body))).data);
+}
+
 /** GET /admin/prices/awaiting: approved tutors' subject cards with no active tutor price yet. */
 export const awaitingPriceSchema = z.object({
   facultyId: z.string(),
   facultyName: z.string(),
   facultyEmail: z.string(),
   approvedAt: z.string().nullable(),
+  /** The subject card; pending = requested from the tutor's profile, approved from the row once priced */
+  cardId: z.string(),
+  cardStatus: z.enum(['pending', 'approved']),
   curriculumId: z.string(),
   subject: z.string(),
   pathLabel: z.string(),

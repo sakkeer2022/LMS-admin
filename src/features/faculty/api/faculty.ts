@@ -131,7 +131,7 @@ export function useSetFacultyActive() {
 /** The tutor's signature from their latest price acceptance, as a blob URL (PNG). The caller revokes it. */
 export async function fetchSignatureBlob(facultyId: string) {
   const url = `/api/v1${at(facultyId)}/price-consent/signature`;
-  const get = () => fetch(url, { credentials: "same-origin", cache: "no-store" });
+  const get = () => fetch(url, { credentials: "same-origin", cache: "no-store", headers: { "x-portal": "admin" } });
   let response = await get();
   if (response.status === 401) {
     await api<unknown>("/auth/me");
@@ -150,7 +150,7 @@ const PREVIEW_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
  */
 export async function fetchDocumentBlob(facultyId: string, documentId: string) {
   const url = `/api/v1${at(facultyId)}/documents/${encodeURIComponent(documentId)}/file`;
-  const get = () => fetch(url, { credentials: "same-origin", cache: "no-store" });
+  const get = () => fetch(url, { credentials: "same-origin", cache: "no-store", headers: { "x-portal": "admin" } });
   let response = await get();
   if (response.status === 401) {
     // An expired access token: api() refreshes the session, then retry once

@@ -15,6 +15,7 @@ import { buildTree, expandableIds, relocation, searchMatches, visibleRows, type 
 import { CategoryDetailPanel, CategoryForm, Rows, type PanelMode } from './category-detail-panel';
 import { DeleteCategoryDialog } from './category-dialogs';
 import { CategoryTreeList, type TreeRow } from './category-tree-list';
+import { LibraryContentTab } from '@/features/library/components/library-content-tab';
 
 function useDebounced<T>(value: T, ms: number) {
   const [debounced, setDebounced] = useState(value);
@@ -35,6 +36,9 @@ function useDebounced<T>(value: T, ms: number) {
 export function CategoryTreePage() {
   const canRead = usePermission('catalogue.read');
   const canManage = usePermission('catalogue.manage');
+  const canModerateLibrary = usePermission('library.moderate');
+  // Categories (the tree) or Library content (tutor submissions to review)
+  const [tab, setTab] = useState<'categories' | 'library'>('categories');
   const tree = useCategoryTree(canRead);
   const relocate = useRelocateCategory();
   const update = useUpdateCategory();
@@ -171,7 +175,7 @@ export function CategoryTreePage() {
     <div aria-hidden="true" className={cx('fixed inset-0 z-40 bg-[rgb(15_23_42/0.38)] transition-opacity duration-200',
       reorder ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0')} />
 
-    <PageHeader title="Categories & content" description={subtitle} actions={canManage && <>
+    <PageHeader title="Categories & content" description={tab === 'library' ? 'Review the files and notes tutors add to their subject cards' : subtitle} actions={canManage && tab === 'categories' && <>
       <Button variant="outline" onClick={() => { setReorder((r) => !r); setPanel({ kind: 'view' }); setDeleting(undefined); }} aria-pressed={reorder}
         disabled={!nodes.length} className={cx('relative', reorder && 'z-50 border-primary text-primary')}>
         {reorder ? 'Done reordering' : 'Reorder'}
@@ -186,10 +190,12 @@ export function CategoryTreePage() {
       <Button size="sm" variant="ghost" onClick={() => setNotice(undefined)}>Dismiss</Button>
     </Card>}
 
-    <Tabs defaultValue="categories">
+    <Tabs value={tab} onValueChange={(next) => { setTab(next === 'library' ? 'library' : 'categories'); setReorder(false); }}>
       <TabsList aria-label="Categories and content">
         <TabsTrigger value="categories">Categories</TabsTrigger>
+        {canModerateLibrary && <TabsTrigger value="library">Library content</TabsTrigger>}
       </TabsList>
+      {canModerateLibrary && <TabsContent value="library"><LibraryContentTab /></TabsContent>}
       <TabsContent value="categories">
         <div className="grid items-start gap-4 pt-4 lg:grid-cols-[minmax(0,1.85fr)_minmax(300px,1fr)]">
           {treeCard}
