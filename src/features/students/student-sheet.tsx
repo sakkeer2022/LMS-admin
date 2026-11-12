@@ -1,6 +1,6 @@
 "use client";
-import { Download, FileCheck2 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Download, Eye } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
@@ -11,10 +11,17 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/shadcn/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn/dialog";
 import { Skeleton } from "@/components/shadcn/skeleton";
 import { usePermission } from "@/components/security/permission-provider";
 import { ApiError } from "@/lib/api/contracts";
-import { useDownloadConsent, useStudent } from "./api";
+import { useDownloadConsent, useStudent, useViewConsent } from "./api";
 import { ConsentBadge, formatDate } from "./students-page";
 import {
   EDUCATION_LEVEL_LABELS,
@@ -53,7 +60,34 @@ export function StudentSheet({
 }) {
   const query = useStudent(studentId);
   const download = useDownloadConsent();
+  const view = useViewConsent();
   const [downloading, setDownloading] = useState(false);
+  const [viewing, setViewing] = useState(false);
+  const [preview, setPreview] = useState<string>();
+
+  // Blob URLs hold the file in memory until revoked
+  useEffect(
+    () => () => {
+      if (preview) URL.revokeObjectURL(preview);
+    },
+    [preview],
+  );
+
+  async function viewConsent(): Promise<void> {
+    if (!student) return;
+    setViewing(true);
+    try {
+      setPreview(await view(student.id));
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError
+          ? error.message
+          : "The consent could not be opened.",
+      );
+    } finally {
+      setViewing(false);
+    }
+  }
   const canRead = usePermission("student.read");
   const student = query.data;
 
@@ -249,23 +283,27 @@ export function StudentSheet({
                     </dl>
                     {canRead && (
                       <div className="flex flex-col gap-1">
-                        <Button
-                          className="w-fit"
-                          disabled={downloading}
-                          aria-busy={downloading || undefined}
-                          onClick={() => void fetchConsent()}
-                        >
-                          {student.consent ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            disabled={viewing || downloading}
+                            aria-busy={viewing || undefined}
+                            onClick={() => void viewConsent()}
+                          >
+                            <Eye aria-hidden className="size-4" />
+                            {viewing ? "Opening…" : "View consent"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            disabled={downloading || viewing}
+                            aria-busy={downloading || undefined}
+                            onClick={() => void fetchConsent()}
+                          >
                             <Download aria-hidden className="size-4" />
-                          ) : (
-                            <FileCheck2 aria-hidden className="size-4" />
-                          )}
-                          {downloading
-                            ? "Preparing…"
-                            : "Download signed consent"}
-                        </Button>
+                            {downloading ? "Preparing…" : "Download"}
+                          </Button>
+                        </div>
                         <p className="text-xs text-text-secondary">
-                          Asks for your password, and the download is recorded
+                          Asks for your password, and viewing or downloading is recorded
                           in the audit log.
                         </p>
                       </div>
@@ -277,6 +315,17 @@ export function StudentSheet({
           )}
         </div>
       </SheetContent>
+      <Dialog open={Boolean(preview)} onOpenChange={(next) => !next && setPreview(undefined)}>
+        <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Signed guardian consent</DialogTitle>
+            <DialogDescription>{student?.fullName}</DialogDescription>
+          </DialogHeader>
+          {preview && (
+            <iframe src={preview} title="Signed guardian consent" className="h-[70vh] w-full rounded-md border" />
+          )}
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }
