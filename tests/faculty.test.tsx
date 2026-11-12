@@ -366,8 +366,8 @@ const detail: FacultyDetail = {
     { id: "d2", type: "PAN_CARD", label: "PAN card", fileName: "pan.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", fileSize: 4096, uploadedAt: "2026-11-04T09:00:00Z", isVerified: true, verifiedAt: "2026-11-04T10:00:00Z", scanStatus: "pending", previewable: false, required: true },
   ],
   subjects: [
-    { assignmentId: "a1", curriculumId: "c1", subject: "Physics", pathLabel: "Academic › School › K-12 › CBSE › Class 11", sessionPricePaise: null, studentPaysPaise: null },
-    { assignmentId: "a2", curriculumId: "c2", subject: "Chemistry", pathLabel: "Academic › School › K-12 › CBSE › Class 11", sessionPricePaise: 80000, studentPaysPaise: 94400 },
+    { assignmentId: "a1", curriculumId: "c1", subject: "Physics", pathLabel: "Academic › School › K-12 › CBSE › Class 11", status: "approved", source: "onboarding", sessionPricePaise: null, studentPaysPaise: null },
+    { assignmentId: "a2", curriculumId: "c2", subject: "Chemistry", pathLabel: "Academic › School › K-12 › CBSE › Class 11", status: "approved", source: "onboarding", sessionPricePaise: 80000, studentPaysPaise: 94400 },
   ],
   pricing: "none",
   consentDecidedAt: null,

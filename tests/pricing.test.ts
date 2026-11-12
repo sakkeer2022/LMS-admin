@@ -6,7 +6,7 @@ describe('pricing schemas accept the live response shapes', () => {
   it('parses a price rule and both resolution outcomes', () => {
     const amounts = { currency: 'INR', durationMinutes: 60, sessionPricePaise: 145000, gstRateBps: 1800, gstPaise: 26100, cgstPaise: 13050, sgstPaise: 13050, studentPaysPaise: 171100 };
     expect(priceRuleSchema.parse({ id: 'r1', curriculumId: 'c1', facultyId: null, facultyName: null, categoryName: 'School', boardName: 'CBSE', subjectName: 'Physics',
-      levelName: 'Class 12', pathLabel: 'Academic › School › K-12 › CBSE', amounts, effectiveFrom: '2026-10-29T09:30:00.000Z', effectiveTo: null, isActive: true, revision: 1, updatedAt: '2026-10-29T09:30:00.000Z' }).amounts.studentPaysPaise).toBe(171100);
+      levelName: 'Class 12', pathLabel: 'Academic › School › K-12 › CBSE', cardId: null, cardStatus: null, amounts, effectiveFrom: '2026-10-29T09:30:00.000Z', effectiveTo: null, isActive: true, revision: 1, updatedAt: '2026-10-29T09:30:00.000Z' }).amounts.studentPaysPaise).toBe(171100);
     expect(resolveResultSchema.parse({ available: false, reason: 'PRICE_NOT_CONFIGURED' }).available).toBe(false);
     expect(resolveResultSchema.parse({ available: true, matchedRuleId: 'r1', matchedOn: 'DEFAULT', curriculumId: 'c1', facultyId: null, amounts }).available).toBe(true);
   });
@@ -87,7 +87,7 @@ describe('awaiting tutor prices', () => {
   const row = (facultyId: string, curriculumId: string, defaultPrice: typeof amounts | null = null) =>
     awaitingPriceSchema.parse({
       facultyId, facultyName: `Tutor ${facultyId}`, facultyEmail: `${facultyId}@example.com`, approvedAt: '2026-11-04T09:00:00Z',
-      curriculumId, subject: 'Physics', pathLabel: 'Academic › School › K-12 › CBSE › Class 11', categoryPath: ['Academic', 'School', 'K-12'],
+      cardId: `card-${facultyId}-${curriculumId}`, cardStatus: 'approved', curriculumId, subject: 'Physics', pathLabel: 'Academic › School › K-12 › CBSE › Class 11', categoryPath: ['Academic', 'School', 'K-12'],
       board: 'CBSE', level: 'Class 11', defaultPrice,
     });
 

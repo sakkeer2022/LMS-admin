@@ -144,6 +144,9 @@ export const facultyDetailSchema = z.object({
       curriculumId: z.string(),
       subject: z.string(),
       pathLabel: z.string(),
+      /** Onboarding cards are approved with the application; profile requests one by one (Pricing) */
+      status: z.enum(["pending", "approved", "rejected"]),
+      source: z.enum(["onboarding", "profile"]),
       sessionPricePaise: z.number().nullable(),
       studentPaysPaise: z.number().nullable(),
     }),
