@@ -1,15 +1,12 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Circle, CircleCheck, KeyRound, MailCheck } from "lucide-react";
+import { Circle, CircleCheck } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import {
-  SettingButton,
-  SettingDialog,
-  SettingField,
-  SettingForm,
-  SettingInput,
-  SettingPasswordInput,
-} from "@/components/settings/setting-layout";
+import { PasswordField, TextField, FormError } from "@/components/forms/field";
+import { Form } from "@/components/forms/form";
+import { FormDialog } from "@/components/forms/form-dialog";
+import { PendingButton } from "@/components/forms/pending-button";
+import { Button } from "@/components/shadcn/button";
 import {
   useChangePassword,
   useRequestChangeCode,
@@ -172,32 +169,23 @@ export function ChangePasswordDialog({
         : "You will be signed out on every device, including this one, and asked to log in again.";
 
   return (
-    <SettingDialog
+    <FormDialog
       open={open}
       onClose={close}
+      busy={busy}
       title={title}
       description={description}
-      icon={
-        step === "done" ? (
-          <Check size={22} aria-hidden />
-        ) : step === "code" ? (
-          <MailCheck size={22} aria-hidden />
-        ) : (
-          <KeyRound size={22} aria-hidden />
-        )
-      }
       footer={
         step === "done" ? null : (
           <>
-            <SettingButton
-              variant="ghost"
+            <Button
+              variant="outline"
               onClick={step === "code" ? () => setStep("form") : close}
               disabled={busy}
             >
               {step === "code" ? "Back" : "Cancel"}
-            </SettingButton>
-            <SettingButton
-              variant="primary"
+            </Button>
+            <PendingButton
               type="submit"
               form="change-password-form"
               pending={busy}
@@ -205,7 +193,7 @@ export function ChangePasswordDialog({
               disabled={step === "form" ? !formReady : !/^[0-9]{6}$/.test(code)}
             >
               {step === "code" ? "Update password" : "Continue"}
-            </SettingButton>
+            </PendingButton>
           </>
         )
       }
@@ -215,7 +203,7 @@ export function ChangePasswordDialog({
           Taking you to the login screen…
         </p>
       ) : (
-        <SettingForm
+        <Form
           id="change-password-form"
           onSubmit={submit}
           noValidate
@@ -224,42 +212,30 @@ export function ChangePasswordDialog({
           <div className="flex flex-col gap-4">
             {step === "form" ? (
               <>
-                <SettingField
+                <PasswordField
                   label="Current password"
-                  htmlFor="current-password"
-                >
-                  <SettingPasswordInput
-                    id="current-password"
-                    name="currentPassword"
-                    autoComplete="current-password"
-                    value={current}
-                    onChange={(event) => setCurrent(event.target.value)}
-                    aria-required
-                  />
-                </SettingField>
-                <SettingField label="New password" htmlFor="new-password">
-                  <SettingPasswordInput
-                    id="new-password"
-                    name="newPassword"
-                    autoComplete="new-password"
-                    value={next}
-                    onChange={(event) => setNext(event.target.value)}
-                    aria-required
-                  />
-                </SettingField>
-                <SettingField
+                  name="currentPassword"
+                  autoComplete="current-password"
+                  value={current}
+                  onChange={(event) => setCurrent(event.target.value)}
+                  aria-required
+                />
+                <PasswordField
+                  label="New password"
+                  name="newPassword"
+                  autoComplete="new-password"
+                  value={next}
+                  onChange={(event) => setNext(event.target.value)}
+                  aria-required
+                />
+                <PasswordField
                   label="Confirm new password"
-                  htmlFor="confirm-password"
-                >
-                  <SettingPasswordInput
-                    id="confirm-password"
-                    name="confirmPassword"
-                    autoComplete="new-password"
-                    value={confirm}
-                    onChange={(event) => setConfirm(event.target.value)}
-                    aria-required
-                  />
-                </SettingField>
+                  name="confirmPassword"
+                  autoComplete="new-password"
+                  value={confirm}
+                  onChange={(event) => setConfirm(event.target.value)}
+                  aria-required
+                />
                 <ul className="grid gap-1.5 rounded-md bg-background px-3.5 py-3 text-xs text-text-secondary" aria-label="Password requirements">
                   {checks.map((check) => (
                     <li key={check.label} data-met={check.met} className="flex items-center gap-2 data-[met=true]:text-success-foreground">
@@ -280,43 +256,37 @@ export function ChangePasswordDialog({
               </>
             ) : (
               <>
-                <SettingField label="Code" htmlFor="change-code">
-                  <SettingInput
-                    id="change-code"
-                    name="otp"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={6}
-                    autoComplete="one-time-code"
-                    value={code}
-                    onChange={(event) =>
-                      setCode(event.target.value.replace(/\D/g, ""))
-                    }
-                    aria-required
-                    autoFocus
-                  />
-                </SettingField>
+                <TextField
+                  label="Code"
+                  name="otp"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(event) =>
+                    setCode(event.target.value.replace(/\D/g, ""))
+                  }
+                  aria-required
+                  autoFocus
+                />
                 <p className="text-sm text-text-secondary">
                   Did not get it?{" "}
-                  <SettingButton
+                  <Button
                     variant="ghost"
                     size="sm"
                     onClick={sendCode}
                     disabled={busy || wait > 0}
                   >
                     {wait > 0 ? `Resend code in ${wait}s` : "Resend code"}
-                  </SettingButton>
+                  </Button>
                 </p>
               </>
             )}
-            {error && (
-              <p className="rounded-md bg-error-subtle px-3 py-2.5 text-sm text-error-foreground" role="alert">
-                {error}
-              </p>
-            )}
+            <FormError message={error || undefined} />
           </div>
-        </SettingForm>
+        </Form>
       )}
-    </SettingDialog>
+    </FormDialog>
   );
 }

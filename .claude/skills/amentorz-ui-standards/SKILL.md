@@ -1,6 +1,6 @@
 ---
 name: amentorz-ui-standards
-description: Amentorz UI/UX standards for every frontend task in amentorz-admin, amentorz-faculty and amentorz-student. Use whenever you create or change a page, component, form, dialog, drawer, table, layout or responsive behaviour, or restyle a screen. It fixes the visual identity (Manrope, purple tokens, 6px radius), the shadcn/ui-first and reuse-first rules, form and dialog patterns, responsive and accessibility rules. Do not use for backend-only work.
+description: Amentorz UI/UX standards for every frontend task in amentorz-admin, amentorz-faculty and amentorz-student. Use whenever you create or change a page, component, form, dialog, drawer, table, list screen, layout or responsive behaviour, or restyle or polish a screen. It fixes the visual identity (Manrope, purple tokens, 6px radius), the shadcn/ui-first and reuse-first rules, form and dialog patterns, the list-screen and interaction patterns (copy buttons, key badges, status badges, tooltips, loading and empty states, cursor and hover) taken from the Students screen, and responsive and accessibility rules. Do not use for backend-only work.
 ---
 
 # Amentorz UI standards
@@ -13,8 +13,9 @@ Related rules that stay in force: each repo's `AGENTS.md` (git, secrets, regions
 
 1. **Say which portal** the work is for (admin, faculty, student) and open the repo's `src/app/globals.css`. Tokens are per repo; the three files are almost the same (see `references/design-system.md`).
 2. **Search for what exists** before creating anything: `src/components/shadcn`, `forms`, `layout`, `auth`, `data-table` and the feature folder you are in. Check `references/component-inventory.md` for the list and for what is copied between repos.
-3. **Pick the nearest existing screen** that does a similar job and copy its structure, spacing and states.
-4. If a Figma frame exists, follow `implement-screen` (read the node, check the frame against our system, never guess a value).
+3. **Listing screens follow one standard** (`references/interaction-patterns.md`, section 2b): search, toolbar, table spacing, pagination, empty state. Compare against Students in the browser before reporting a listing done. Never hand-roll a table, footer or search box.
+4. **Pick the nearest existing screen** that does a similar job and copy its structure, spacing and states. For any list, table, drawer or detail screen in admin that is `src/features/students/`; read `references/interaction-patterns.md` first.
+5. If a Figma frame exists, follow `implement-screen` (read the node, check the frame against our system, never guess a value).
 
 ## Mandatory principles
 
@@ -23,6 +24,7 @@ Related rules that stay in force: each repo's `AGENTS.md` (git, secrets, regions
 - **shadcn/ui first.** When a suitable shadcn primitive exists, use it; see `references/shadcn-guidelines.md` for what is installed, how to add more and the known exceptions.
 - **Tokens, not values.** Colours, radii, shadows and the type scale come from `globals.css` token classes (`bg-primary`, `text-muted-foreground`, `border-border-subtle`, `bg-success-subtle text-success-foreground`, `rounded-card`). A missing value is added to `globals.css` from Figma (`get_variable_defs`), never written as a hex in a component.
 - **Every state exists.** Loading (Skeleton), empty (`EmptyState`), error (inline message with a retry), disabled, pending (button text changes, control disabled) and, for admin, permission-denied. The frame usually shows only one; build all.
+- **Interaction polish is part of the job.** Pointer cursor and hover/focus states on everything pressable, tooltips on icon-only buttons, `StatusBadge` for statuses, `Kbd` for keys, `CopyValue` for values admins reuse, skeleton loading that matches the layout, an `EmptyState` with a next step, and friendly errors with a retry. The checklist is in `references/interaction-patterns.md` (section 5).
 - **Responsive and accessible by default**, not as a final pass. See `references/responsive-and-accessibility.md`.
 - **Do not change what a screen shows or collects** without raising it as a pending decision (repo rule: the UI design is final).
 
@@ -30,7 +32,7 @@ Related rules that stay in force: each repo's `AGENTS.md` (git, secrets, regions
 
 - Label above the control, `*` (aria-hidden, `text-error-foreground`) for required, hint `text-xs text-muted-foreground`, error text under the control in `text-error-foreground` and tied to it with `aria-describedby` and `aria-invalid`.
 - One column on phones, `sm:grid-cols-2` for short paired fields, `gap-4` between a pair and `gap-5` between rows.
-- Dropdowns: the shadcn `Select`, wrapped in a labelled field. Admin forms use the native-select wrapper today; keep to the pattern of the portal you are in (see the exceptions list).
+- Dropdowns: the shadcn `Select`, wrapped in a labelled field. Admin list filters already use the shadcn `Select` (Students); admin forms still use the native-select wrapper until migrated. Keep to one kind inside a single form, and see the exceptions list.
 - Dialogs use the shadcn `Dialog`; student popups use `AppDialog` (560px, `wide` 720px). Destructive or irreversible actions get a confirmation (`ConfirmDialog` in admin). Long edit forms in admin open in a `Sheet`.
 - A dialog or sheet never exceeds the viewport: it scrolls inside, with header and footer fixed.
 
@@ -38,7 +40,7 @@ Related rules that stay in force: each repo's `AGENTS.md` (git, secrets, regions
 
 - No hex, `rgb()` or arbitrary colour in components. (Existing exceptions are the brand panel `#18082f` and the student landing page; do not add more.)
 - No inline `style` for look and feel; no duplicate CSS; no new CSS files, UI library, icon set or font. Icons are `lucide-react`; classes merge with `cn` from `@/lib/utils`.
-- No gradients, extra shadows or decorative animation unless the frame shows them. Shadows in use: `shadow-card`, `shadow-xs`, `shadow-lg` (dialogs, popovers). Motion uses `tw-animate-css` classes behind `motion-safe:`.
+- No gradients, extra shadows or purely decorative animation unless the frame shows them. Shadows in use: `shadow-card`, `shadow-xs`, `shadow-lg` (dialogs, popovers). Short purposeful motion is allowed (hover transitions, rows fading in, a copy check, a progress bar filling): `tw-animate-css` classes behind `motion-safe:`, or `motion-reduce:transition-none`, 150-300 ms.
 - No random radii: controls `rounded-md`, chips and badges `rounded-pill`, cards `rounded-card`/`rounded-panel` where the repo defines them. Note `rounded-sm|md|lg|xl` are all 6px here.
 - No one-off control heights: Input and default Button are `h-10`, large Button `h-12`, small `h-8`.
 
@@ -77,4 +79,5 @@ Related rules that stay in force: each repo's `AGENTS.md` (git, secrets, regions
 - Never document or use a colour, font, component or package that is not in the repo. When something here no longer matches the code, fix the reference file, not the code.
 - When a portal differs from the others, record the difference (the references list the known ones) instead of forcing sameness.
 - When you introduce a convention that other screens should follow, add it to the matching reference file in the same change.
-- **Undetermined, ask before deciding:** a searchable select/combobox (no `Command` or `Popover` installed), a toast convention for the student portal (none exists), dark theme (none), and whether `Form` from shadcn with react-hook-form should be used (it is not installed and barely used).
+- **Out of scope:** dark theme. Do not add `dark:` styling or a theme switch.
+- **Undetermined, ask before deciding:** a searchable select/combobox (no `Command` or `Popover` installed), a toast convention for the student portal (none exists), and whether `Form` from shadcn with react-hook-form should be used (it is not installed and barely used).

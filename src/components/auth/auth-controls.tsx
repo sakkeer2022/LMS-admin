@@ -2,12 +2,13 @@
 import { forwardRef, useState, type ComponentProps, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { Lock, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/shadcn/button";
 import { Checkbox } from "@/components/shadcn/checkbox";
 import { Input } from "@/components/shadcn/input";
 import { Label } from "@/components/shadcn/label";
+import { RevealButton } from "@/components/forms/reveal-button";
 
 /* Sign-in and recovery building blocks (Figma "Screen/02 · Login"). */
 
@@ -102,19 +103,7 @@ export function AuthField({
           className={cn(Icon && "pl-10", reveal && "pr-10", className)}
         />
         {reveal && (
-          <button
-            type="button"
-            aria-label={visible ? "Hide password" : "Show password"}
-            aria-pressed={visible}
-            onClick={() => setVisible((v) => !v)}
-            className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            {visible ? (
-              <EyeOff aria-hidden className="size-5" />
-            ) : (
-              <Eye aria-hidden className="size-5" />
-            )}
-          </button>
+          <RevealButton visible={visible} onToggle={() => setVisible((v) => !v)} />
         )}
       </div>
       {hint && !error && (

@@ -12,7 +12,7 @@ When a suitable shadcn primitive exists, use it instead of writing a custom one.
 
 ## Installed (all repos unless noted)
 
-`avatar`, `badge`, `button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `input`, `label`, `select`, `sheet`, `skeleton`, `table`, `tabs`, `textarea`, `tooltip`; `calendar` (admin, student); `native-select`, `switch` (admin); `progress` (faculty).
+`avatar`, `badge`, `button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `input`, `label`, `select`, `sheet`, `skeleton`, `table`, `tabs`, `textarea`, `tooltip`; `calendar` (admin, student); `native-select`, `switch`, `kbd` (admin); `progress` (faculty).
 
 ## Not installed
 
@@ -24,7 +24,7 @@ When a suitable shadcn primitive exists, use it instead of writing a custom one.
 |---|---|---|
 | Modal | `Dialog`; student popups via `AppDialog`; admin confirmations via `ConfirmDialog` | `AlertDialog` is not installed; `ConfirmDialog` is the existing confirm pattern. |
 | Side panel for a record or long form | `Sheet` (`w-full … sm:max-w-md|lg|xl`, `overflow-y-auto`) | Admin faculty review and pricing use it. |
-| Choose one of a short list | `Select` (student) / `NativeSelect` through the admin `SelectField` (admin) | See exceptions. |
+| Choose one of a short list | `Select` (student, and admin list filters) / `NativeSelect` through the admin `SelectField` (admin forms) | See exceptions and `interaction-patterns.md` (Radix details). |
 | Choose from a long or searchable list | **undetermined**: no `Command`/`Popover` yet | Ask the user; if approved, `npx shadcn@latest add popover command` (new-york, `@/components/shadcn`), then check the generated files against `globals.css` tokens. |
 | Row actions menu | `DropdownMenu` | |
 | Tabs | `Tabs`, `variant="line"` for page status tabs (admin faculty page) | |
@@ -51,6 +51,6 @@ When a suitable shadcn primitive exists, use it instead of writing a custom one.
 
 ## Exceptions and open questions
 
-- **Admin dropdowns are native.** `SelectField` in `amentorz-admin/src/components/forms/field.tsx` renders `NativeSelect`; no admin file uses the shadcn `Select`. Student uses the shadcn `Select`. Follow the portal you are in; do not mix both in one form; raise it before unifying.
-- **Admin settings page** (`components/settings/setting-layout.tsx`) has its own `SettingInput`, `SettingButton`, `SettingSelect`, `SettingDialog` instead of the primitives. Treat it as legacy for that page; do not reuse it elsewhere.
+- **Admin dropdowns: filters use shadcn, forms still native.** The Students filters and rows-per-page use the shadcn `Select` (icon in the trigger, active state, "all" sentinel for no filter). `SelectField` in `amentorz-admin/src/components/forms/field.tsx` still renders `NativeSelect` for forms. Do not mix both in one form; migrate forms module by module and say so when you do.
+- **Settings-style screens** (Settings, Profile) use the standard controls. `components/settings/setting-layout.tsx` is layout only (`SettingsPage`, `SettingCard`, `SettingRow`, `SettingCallout`, `SettingPills`, `StickyBar`); its old `SettingInput`, `SettingSelect`, `SettingButton`, `SettingDialog` and friends are gone, and `tests/standard-controls.test.ts` fails if they return. The time-zone list stays a native select on purpose (about 400 options, the browser lets you type to find one).
 - **Admin's `implement-screen` skill is out of date**: it points at `src/components/ui` and a "UI lint" that no longer exist (the primitives are in `src/components/shadcn`, there is no `scripts/` folder or lint script, and `UI_IMPLEMENTATION.md` says the AST lint was retired). Follow the actual folders; the other two repos' copies of that skill are correct.

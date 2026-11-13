@@ -3,7 +3,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { TextField } from '@/components/forms/field';
 import { PanelMessage } from '@/components/layout/panel-message';
-import { Badge } from '@/components/shadcn/badge';
+import { StatusBadge } from '@/components/feedback/status-badge';
 import { Button } from '@/components/shadcn/button';
 import { Card } from '@/components/shadcn/card';
 import { Skeleton } from '@/components/shadcn/skeleton';
@@ -84,10 +84,10 @@ export function CategoryDetailView({ detail, node, canManage, pending, onAddChil
       </div>
       <dl className="m-0 flex flex-col gap-3">
         <Row label="Status">
-          <Badge variant={node.isActive ? 'success' : 'warning'}>
+          <StatusBadge status={node.isActive ? 'active' : 'inactive'}>
             <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-current" />
             {node.isActive ? 'Active' : 'Inactive'}
-          </Badge>
+          </StatusBadge>
         </Row>
         <Row label="Created"><span className="font-semibold">{dateFormat.format(new Date(detail.createdAt))}</span></Row>
       </dl>

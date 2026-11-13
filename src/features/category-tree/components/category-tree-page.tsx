@@ -1,11 +1,20 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowUpDown,
+  Check,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  FolderTree,
+  Loader2,
+  Plus,
+  SearchX,
+} from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { PanelMessage } from "@/components/layout/panel-message";
 import { Button } from "@/components/shadcn/button";
 import { Card } from "@/components/shadcn/card";
-import { Input } from "@/components/shadcn/input";
 import {
   Tabs,
   TabsContent,
@@ -13,6 +22,9 @@ import {
   TabsTrigger,
 } from "@/components/shadcn/tabs";
 import { cn as cx } from "@/lib/utils";
+import { SearchInput } from "@/components/forms/search-input";
+import { Kbd } from "@/components/shadcn/kbd";
+import { EmptyState } from "@/components/layout/empty-state";
 import { usePermission } from "@/components/security/permission-provider";
 import { describeApiError } from "@/lib/api/errors";
 import {
@@ -217,21 +229,13 @@ export function CategoryTreePage() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {!reorder && (
-            <div className="relative">
-              <Search
-                size={14}
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
-              />
-              <Input
-                type="search"
-                aria-label="Search categories"
-                placeholder="Search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-8 w-40 pl-8"
-              />
-            </div>
+            <SearchInput
+              label="Search categories"
+              placeholder="Search categories"
+              value={search}
+              onChange={setSearch}
+              className="w-56"
+            />
           )}
           <Button
             size="sm"
@@ -241,6 +245,7 @@ export function CategoryTreePage() {
             }
             disabled={!allExpandable.length}
           >
+            {allOpen ? <ChevronsDownUp aria-hidden /> : <ChevronsUpDown aria-hidden />}
             {allOpen ? "Collapse all" : "Expand all"}
           </Button>
           {reorder && (
@@ -255,17 +260,27 @@ export function CategoryTreePage() {
           id="category-tree-reorder-help"
           className="px-5 pb-2 text-xs text-muted-foreground"
         >
-          Keyboard: focus a row, then Alt+Up or Alt+Down to reorder, Alt+Right
-          to nest under the row above, Alt+Left to move out. Escape ends
-          reordering.
+          Keyboard: focus a row, then <Kbd>Alt</Kbd> + <Kbd>↑</Kbd> or{" "}
+          <Kbd>↓</Kbd> to reorder, <Kbd>Alt</Kbd> + <Kbd>→</Kbd> to nest under
+          the row above, <Kbd>Alt</Kbd> + <Kbd>←</Kbd> to move out.{" "}
+          <Kbd>Esc</Kbd> ends reordering.
         </p>
       )}
 
       <div className="border-t">
         {tree.isPending ? (
-          <div className="p-5">
-            <Rows count={8} />
-          </div>
+          <>
+            <p
+              role="status"
+              className="flex items-center gap-2 border-b border-border-subtle bg-accent/30 px-5 py-2 text-xs font-medium text-accent-foreground"
+            >
+              <Loader2 aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
+              Loading…
+            </p>
+            <div className="p-5">
+              <Rows count={8} />
+            </div>
+          </>
         ) : tree.isError ? (
           <div className="p-5">
             <PanelMessage onRetry={() => void tree.refetch()}>
@@ -274,18 +289,33 @@ export function CategoryTreePage() {
             </PanelMessage>
           </div>
         ) : nodes.length === 0 ? (
-          <div className="flex flex-col items-start gap-3 p-5">
-            <p className="text-sm">
-              There are no categories yet. Start with a root such as Academic.
-            </p>
-            {canManage && (
-              <Button onClick={() => addUnder(null)}>Add category</Button>
-            )}
+          <div className="p-5">
+            <EmptyState
+              icon={FolderTree}
+              title="No categories yet"
+              description="Start with a root such as Academic; tutors choose their subjects from this tree."
+              action={
+                canManage ? (
+                  <Button onClick={() => addUnder(null)}>
+                    <Plus aria-hidden /> Add category
+                  </Button>
+                ) : undefined
+              }
+            />
           </div>
         ) : rows.length === 0 ? (
-          <p className="p-5 text-sm text-muted-foreground">
-            Nothing matches “{q}”.
-          </p>
+          <div className="p-5">
+            <EmptyState
+              icon={SearchX}
+              title={`Nothing matches “${q}”`}
+              description="Try a different word, or clear the search to see every category."
+              action={
+                <Button variant="outline" onClick={() => setSearch("")}>
+                  Clear search
+                </Button>
+              }
+            />
+          </div>
         ) : (
           <CategoryTreeList
             rows={rows}
@@ -349,6 +379,7 @@ export function CategoryTreePage() {
                   reorder && "z-50 border-primary text-primary",
                 )}
               >
+                <ArrowUpDown aria-hidden />
                 {reorder ? "Done reordering" : "Reorder"}
               </Button>
               <Button
@@ -356,6 +387,7 @@ export function CategoryTreePage() {
                 title="Add a top-level category"
                 onClick={() => addUnder(null)}
               >
+                <Plus aria-hidden />
                 Add category
               </Button>
             </>
@@ -373,10 +405,11 @@ export function CategoryTreePage() {
         >
           <p
             className={cx(
-              "text-sm",
+              "flex items-center gap-2 text-sm",
               notice.tone === "danger" && "text-error-foreground",
             )}
           >
+            <AlertTriangle aria-hidden className="size-4 shrink-0" />
             {notice.text}
           </p>
           {notice.stale && (

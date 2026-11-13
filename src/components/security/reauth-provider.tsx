@@ -1,5 +1,4 @@
 "use client";
-import { ShieldCheck } from "lucide-react";
 import {
   createContext,
   useCallback,
@@ -10,13 +9,11 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import {
-  SettingButton,
-  SettingDialog,
-  SettingField,
-  SettingForm,
-  SettingPasswordInput,
-} from "@/components/settings/setting-layout";
+import { PasswordField } from "@/components/forms/field";
+import { Form } from "@/components/forms/form";
+import { FormDialog } from "@/components/forms/form-dialog";
+import { PendingButton } from "@/components/forms/pending-button";
+import { Button } from "@/components/shadcn/button";
 import { api } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/contracts";
 import { isReauthRequired } from "@/lib/api/reauth";
@@ -115,19 +112,18 @@ export function ReauthProvider({ children }: { children: ReactNode }) {
   return (
     <ReauthContext.Provider value={value}>
       {children}
-      <SettingDialog
+      <FormDialog
         open={open}
         onClose={close}
+        busy={pending}
         title="Confirm your password"
         description="This action needs a fresh confirmation. It stays valid for a few minutes."
-        icon={<ShieldCheck size={20} aria-hidden />}
         footer={
           <>
-            <SettingButton variant="ghost" onClick={close} disabled={pending}>
+            <Button variant="outline" onClick={close} disabled={pending}>
               Cancel
-            </SettingButton>
-            <SettingButton
-              variant="primary"
+            </Button>
+            <PendingButton
               type="submit"
               form="reauth-form"
               pending={pending}
@@ -135,30 +131,23 @@ export function ReauthProvider({ children }: { children: ReactNode }) {
               disabled={!password}
             >
               Confirm
-            </SettingButton>
+            </PendingButton>
           </>
         }
       >
-        <SettingForm
-          id="reauth-form"
-          onSubmit={(event) => void submit(event)}
-          noValidate
-          pending={pending}
-        >
-          <SettingField label="Password" htmlFor="reauth-password">
-            <SettingPasswordInput
-              id="reauth-password"
-              name="password"
-              autoComplete="current-password"
-              autoFocus
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              error={error || undefined}
-              aria-required
-            />
-          </SettingField>
-        </SettingForm>
-      </SettingDialog>
+        <Form id="reauth-form" onSubmit={(event) => void submit(event)} noValidate pending={pending}>
+          <PasswordField
+            label="Password"
+            name="password"
+            autoComplete="current-password"
+            autoFocus
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            error={error || undefined}
+            aria-required
+          />
+        </Form>
+      </FormDialog>
     </ReauthContext.Provider>
   );
 }

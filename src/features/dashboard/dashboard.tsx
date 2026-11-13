@@ -7,13 +7,18 @@ import {
   AlertTriangle,
   CalendarDays,
   ChevronRight,
+  Download,
   Eye,
+  GraduationCap,
   IndianRupee,
+  ListFilter,
   ShieldCheck,
   Star,
+  Users,
+  type LucideIcon,
 } from "lucide-react";
+import { StatusBadge, type StatusTone } from "@/components/feedback/status-badge";
 import { usePermission } from "@/components/security/permission-provider";
-import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
 import {
@@ -37,27 +42,33 @@ import { sessions as sessionRows, useDashboard, type DemoState } from "./adapter
 type SessionRow = (typeof sessionRows)[number];
 
 const STATUSES = ["Completed", "In progress", "Confirmed", "Cancelled"];
-const statusVariant = {
-  Completed: "success",
-  "In progress": "default",
-  Confirmed: "info",
-  Cancelled: "destructive",
-} as const;
+// The session labels stay as they are; only their colour comes from the shared status table
+const statusTone: Record<string, StatusTone> = {
+  Completed: "completed",
+  "In progress": "processing",
+  Confirmed: "approved",
+  Cancelled: "cancelled",
+};
 
 function StatusPill({ status }: { status: string }) {
   return (
-    <Badge variant={statusVariant[status as keyof typeof statusVariant] ?? "secondary"}>
+    <StatusBadge status={statusTone[status] ?? "inactive"}>
       <span aria-hidden className="size-1.5 rounded-pill bg-current" />
       {status}
-    </Badge>
+    </StatusBadge>
   );
 }
 
 const columns: ColumnDef<SessionRow>[] = [
-  { accessorKey: "time", header: "Time" },
+  {
+    accessorKey: "time",
+    header: "Time",
+    cell: ({ getValue }) => <span className="tabular-nums text-text-secondary">{getValue<string>()}</span>,
+  },
   {
     accessorKey: "student",
     header: "Student",
+    meta: { mobile: "title" },
     cell: ({ getValue }) => <span className="font-semibold">{getValue<string>()}</span>,
   },
   { accessorKey: "tutor", header: "Tutor" },
@@ -89,12 +100,33 @@ const severityTone = {
   info: "text-info-foreground",
 } as const;
 
+const statIcons: Record<string, LucideIcon> = {
+  "Total users": Users,
+  "Sessions today": CalendarDays,
+  "Revenue this month": IndianRupee,
+  "Active tutors": GraduationCap,
+};
+
+const toneBg = {
+  danger: "bg-error-subtle text-error-foreground",
+  warning: "bg-warning-subtle text-warning-foreground",
+  info: "bg-info-subtle text-info-foreground",
+} as const;
+
 function StatTile({ label, value, detail }: { label: string; value: string; detail: string }) {
+  const Icon = statIcons[label];
   return (
-    <Card className="gap-2 p-5">
-      <p className="text-xs font-semibold tracking-[0.02em] text-text-secondary">{label}</p>
-      <p className="text-3xl font-bold tracking-tight">{value}</p>
-      <p className="text-xs text-muted-foreground">{detail}</p>
+    <Card className="flex-row items-start gap-4 p-5">
+      {Icon && (
+        <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-md bg-accent text-primary">
+          <Icon className="size-5" />
+        </span>
+      )}
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="text-xs font-semibold tracking-[0.02em] text-text-secondary">{label}</p>
+        <p className="text-3xl leading-9 font-bold tracking-tight tabular-nums">{value}</p>
+        <p className="text-xs text-muted-foreground">{detail}</p>
+      </div>
     </Card>
   );
 }
@@ -111,7 +143,7 @@ function AlertRow({
   const allowed = usePermission(permission);
   const row = "flex items-center gap-3 border-b border-border-subtle py-3";
   return allowed ? (
-    <Link href={href} className={cn(row, "rounded-md outline-none hover:bg-background focus-visible:ring-[3px] focus-visible:ring-ring/50")}>
+    <Link href={href} className={cn(row, "rounded-md outline-none transition-colors hover:bg-accent/40 focus-visible:ring-[3px] focus-visible:ring-ring/50")}>
       {children}
       <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground" />
     </Link>
@@ -179,6 +211,7 @@ export function Dashboard() {
               )
             }
           >
+            <Download aria-hidden />
             Export summary
           </Button>
         }
@@ -232,7 +265,9 @@ export function Dashboard() {
                       <strong className="text-sm leading-5 font-semibold">{a.title}</strong>
                       <p className="text-xs text-muted-foreground">{a.detail}</p>
                     </div>
-                    <span className={cn("text-base font-semibold", tone)}>{a.count}</span>
+                    <span className={cn("min-w-8 rounded-pill px-2 py-0.5 text-center text-sm font-semibold tabular-nums", toneBg[a.severity as keyof typeof toneBg])}>
+                      {a.count}
+                    </span>
                   </AlertRow>
                 );
               })
@@ -258,7 +293,9 @@ export function Dashboard() {
                   const Icon = activityIcons[a.icon as keyof typeof activityIcons] ?? CalendarDays;
                   return (
                     <li key={a.description} className="flex items-start gap-3 border-b border-border-subtle py-3">
-                      <Icon aria-hidden className="size-5 shrink-0 text-text-secondary" />
+                      <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-md bg-accent text-primary">
+                        <Icon className="size-4" />
+                      </span>
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <p className="text-sm">{a.description}</p>
                         <small className="text-xs text-muted-foreground">{a.time}</small>
@@ -279,7 +316,10 @@ export function Dashboard() {
           <CardAction>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline">{status ? `Status: ${status}` : "Filter"}</Button>
+                <Button variant="outline" className={cn(status && "border-primary bg-accent/40")}>
+                  <ListFilter aria-hidden />
+                  {status ? `Status: ${status}` : "Filter"}
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Status</DropdownMenuLabel>

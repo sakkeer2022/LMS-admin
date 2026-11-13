@@ -4,7 +4,7 @@ Verified against the repos (admin and faculty on `development`, student on `deve
 
 ## Primitives: `src/components/shadcn` (all repos)
 
-`avatar`, `badge`, `button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `input`, `label`, `select`, `sheet`, `skeleton`, `table`, `tabs`, `textarea`, `tooltip`. Identical across the repos except as listed under "Only in one repo". Add `calendar` (admin, student). See `shadcn-guidelines.md`.
+`avatar`, `badge`, `button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `input`, `label`, `select`, `sheet`, `skeleton`, `table`, `tabs`, `textarea`, `tooltip`. (`kbd` is admin only.) Identical across the repos except as listed under "Only in one repo". Add `calendar` (admin, student). See `shadcn-guidelines.md`.
 
 - `Button`: variants `default`, `destructive`, `outline`, `secondary`, `ghost`, `link`; sizes `default` (h-10), `xs`, `sm` (h-8), `lg` (h-12), `icon`, `icon-xs`, `icon-sm`, `icon-lg`. `asChild` renders a link as a button.
 - `Badge`: variants `default`, `secondary`, `success`, `warning`, `info`, `destructive`, `outline`, `ghost`, `link`; pill shaped, `text-xs`.
@@ -18,7 +18,7 @@ Only in one repo: `native-select` and `switch` (admin), `progress` (faculty). Ad
 | Component | Where | Use |
 |---|---|---|
 | `PageHeader({title, description?, actions?})` | all | Page `h1` (`text-2xl font-bold`) with optional description and right-hand actions; wraps on phones. |
-| `EmptyState({title, description?, action?})` | all | Dashed-border empty panel. Use instead of a blank page or a static placeholder. |
+| `EmptyState({icon?, title, description?, action?})` | all | Dashed-border empty panel; the optional lucide `icon` sits in an accent circle (admin). Use instead of a blank page or a static placeholder. |
 | `PanelMessage({children, onRetry?})` | all | Inline panel message; with `onRetry` it is `role="alert"` and shows a Retry button. Use for a failed load. |
 | `AdminShell` / `FacultyShell` / `StudentShell` | per repo | Sidebar (drawer below `lg`), top bar, `<main id="main">`. Do not build another shell. |
 | `SidebarNav`, `Topbar` | admin, faculty | Navigation lists come from `layout/admin/navigation.ts`, `faculty-nav.ts`, `student-nav.ts`. |
@@ -27,7 +27,7 @@ Only in one repo: `native-select` and `switch` (admin), `progress` (faculty). Ad
 
 ## Data display: `src/components/data-table`
 
-`DataTable` (TanStack Table; define columns as `ColumnDef[]`, `meta: { align: "right" }` for numbers, takes a `caption`) and `TablePagination` (server pagination: result count, Previous, Next). Used by admin (4 places); present in faculty and student, not yet used there.
+`DataTable` (TanStack Table; define columns as `ColumnDef[]`, `meta: { align: "right" }` for numbers, takes a `caption`; the table from `md` and **phone cards below it** (generated from the columns, steered with `meta.mobile`, `meta.mobileHideWhen` or `renderCard`); header band, "Loading…" line, fade-in rows and an icon empty state are built in; `onRowClick`, `canClickRow` and `isRowSelected` make rows clickable and highlight the open one) and `TablePagination` (server pagination: result count, Previous, Next). Used by admin (4 places); present in faculty and student, not yet used there.
 
 ## Forms
 
@@ -39,7 +39,26 @@ Only in one repo: `native-select` and `switch` (admin), `progress` (faculty). Ad
 | `OtpInput`, `SignaturePad`, `ColumnPicker` | student `components/forms` | Six-box code; drawn signature (`onInkChange`); cascading single-choice columns. |
 | `SelectField({id,label,value,onChange,options,placeholder,error,hint,required})` | student `components/forms/SelectField.tsx` (added in LMS-105; on `development` only once that branch is merged) | Labelled shadcn `Select` with an `h-10` trigger to match `Input`. The student-portal dropdown. |
 | `PhoneField({id,label,countries,value,onChange,...})` | student `components/forms/PhoneField.tsx` (LMS-105) | Country-code `Select` beside the number input; codes come from `GET /regions/countries`, never typed in code. |
-| `SettingInput`, `SettingSelect`, `SettingButton`, `SettingDialog`, … | admin `components/settings/setting-layout.tsx` | Settings page only; it has its own control styling. Do not copy it into other pages. |
+| `PasswordField`, `PasswordInput`, `RevealButton` | admin `components/forms` (`field.tsx`, `password-input.tsx`, `reveal-button.tsx`) | A labelled password field with the show/hide eye; the auth screens use the same `RevealButton`. |
+| `Form({pending})` | admin `components/forms/form.tsx` | A form that disables every control inside while it saves. |
+| `PendingButton({pending, pendingLabel})` | admin `components/forms/pending-button.tsx` | A `Button` that shows a spinner and its own label while an action runs. |
+| `FormDialog({open, onClose, busy, title, description, footer})` | admin `components/forms/form-dialog.tsx` | A dialog for a form: cannot be closed (Esc, outside click, close button) while `busy`. Used by re-authentication, change password and policy upload. |
+| `SettingsPage`, `SettingCard`, `SettingRow({label, description, htmlFor, error, narrow})`, `SettingCallout`, `SettingPills`, `StickyBar` | admin `components/settings/setting-layout.tsx` | Layout of a settings-style page. Controls inside a row are the standard ones. |
+
+## Interaction pieces (admin; see `interaction-patterns.md`)
+
+| Component | Where | Use |
+|---|---|---|
+| `CopyValue({value,label,children?})`, `CopyButton({value,label})` | `components/feedback/copy-button.tsx` | Copy an email, phone, ID or fingerprint: hover/focus button, check icon for 1.5 s, toast on clipboard failure. |
+| `StatusBadge({status})` | `components/feedback/status-badge.tsx` | One colour per status (active/approved/completed green, pending amber, processing blue, inactive/cancelled grey, rejected/failed red). |
+| `Kbd` | `components/shadcn/kbd.tsx` | A keyboard key inside an instruction or tooltip. |
+| `Tip({label, children})` | `components/feedback/tip.tsx` | Tooltip for an icon-only control; `label` may hold a `Kbd`. |
+| `PersonAvatar({name, size?})` | `components/feedback/person-avatar.tsx` | Initials in a tinted circle (students, tutors). |
+| `SearchInput({value, onChange, label, placeholder})` | `components/forms/search-input.tsx` | List search with icon, clear button, `/` to focus and `Esc` to clear. |
+| `FilterChip({label, onRemove})` | `components/feedback/filter-chip.tsx` | Removable active-filter pill. |
+| `formatDate`, `relativeDate` | `lib/format/dates.ts` | Exact date and "3 days ago". |
+| `ConsentBadge`, `MinorBadge` | `features/students/student-ui.tsx` | Students-specific badges built on `StatusBadge` and `Tip`. |
+| `StudentsList`, `StudentsFilters`, `StudentsPagination`, `StudentSheet`, `Stat` (in `students-page.tsx`) | `features/students/` | The reference list screen: table + phone cards, filters with chips, pagination, detail drawer, summary tiles. Copy the structure for other lists. |
 
 ## Dialogs, drawers and feedback
 

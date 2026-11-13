@@ -39,6 +39,8 @@ export interface ConsentRecord {
 }
 
 export interface AdminStudentDetail extends AdminStudent {
+  /** Where the student lives; collected at registration */
+  city?: string | null;
   /** How the student heard about Amentorz (optional at registration) */
   referral: { code: string; name: string; other: string | null } | null;
   /** Optional education details; any field may be missing */
@@ -46,6 +48,8 @@ export interface AdminStudentDetail extends AdminStudent {
     level: string | null;
     institutionName: string | null;
     detail: string | null;
+    /** Board or stream, when the student gave one */
+    stream?: string | null;
   } | null;
   learningProfile: {
     teachingLanguage: string | null;

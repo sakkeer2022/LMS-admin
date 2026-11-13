@@ -1,16 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
-import { FileText, NotebookPen, Search } from "lucide-react";
+import { FileText, NotebookPen } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "@/components/data-table/data-table";
 import { TablePagination } from "@/components/data-table/table-pagination";
-import { EmptyState } from "@/components/layout/empty-state";
 import { PanelMessage } from "@/components/layout/panel-message";
 import { usePermission } from "@/components/security/permission-provider";
 import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
 import { Card } from "@/components/shadcn/card";
-import { Input } from "@/components/shadcn/input";
-import { Skeleton } from "@/components/shadcn/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/shadcn/table";
+import { SearchInput } from "@/components/forms/search-input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/shadcn/tabs";
 import { describeApiError } from "@/lib/api/errors";
 import { formatDateTime } from "@/features/faculty/schemas/faculty";
@@ -46,8 +45,9 @@ export function LibraryContentTab() {
   const [search, setSearch] = useState("");
   const [q, setQ] = useState<string>();
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(LIMIT);
   const [openId, setOpenId] = useState<string>();
-  const list = useSubmissions({ status, q, page, limit: LIMIT }, canModerate);
+  const list = useSubmissions({ status, q, page, limit }, canModerate);
   const counts = useSubmissionCounts(q, canModerate);
 
   // Debounced server-side search; a new search starts on page 1
@@ -64,6 +64,74 @@ export function LibraryContentTab() {
 
   if (!canModerate) return <PanelMessage>You don&apos;t have permission to review library content.</PanelMessage>;
 
+
+  const columns: ColumnDef<Submission>[] = [
+    {
+      id: "resource",
+      header: "Resource",
+      cell: ({ row: { original: row } }) => (
+        <div className="flex min-w-0 items-start gap-2">
+          {row.kind === "note" ? (
+            <NotebookPen aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <FileText aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          )}
+          <div className="flex max-w-56 min-w-0 flex-col">
+            <span className="flex flex-wrap items-center gap-2 font-medium break-words whitespace-normal">
+              {row.title}
+              {row.isEdit && <Badge variant="info">Edit</Badge>}
+            </span>
+            <span className="truncate text-xs text-muted-foreground">{row.kind === "note" ? "Note" : row.file?.name}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "tutor",
+      header: "Tutor",
+      cell: ({ row: { original: row } }) => (
+        <div className="flex min-w-0 flex-col">
+          <span className="font-medium">{row.faculty.fullName}</span>
+          <span className="max-w-48 truncate text-xs text-muted-foreground" title={row.faculty.email}>{row.faculty.email}</span>
+        </div>
+      ),
+    },
+    {
+      id: "card",
+      header: "Subject card",
+      cell: ({ row: { original: row } }) => (
+        <div className="flex max-w-64 min-w-0 flex-col">
+          <span className="font-medium">{row.card.subject}</span>
+          <span className="truncate text-xs text-muted-foreground" title={row.card.pathLabel}>{row.card.pathLabel}</span>
+        </div>
+      ),
+    },
+    {
+      id: "submitted",
+      header: "Submitted",
+      cell: ({ row }) => <span className="text-sm text-text-secondary">{formatDateTime(row.original.submittedAt)}</span>,
+    },
+    { id: "status", header: "Status", cell: ({ row }) => <SubmissionStatusBadge status={row.original.status} /> },
+    {
+      id: "actions",
+      header: () => <span className="sr-only">Actions</span>,
+      meta: { className: "w-24" },
+      cell: ({ row: { original: row } }) => (
+        <Button
+          size="sm"
+          variant={row.status === "pending" ? "default" : "outline"}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpenId(row.id);
+          }}
+          aria-label={`${row.status === "pending" ? "Review" : "View"} ${row.title} by ${row.faculty.fullName}`}
+        >
+          {row.status === "pending" ? "Review" : "View"}
+        </Button>
+      ),
+    },
+  ];
+
   const countOf = (tab: SubmissionFilter) =>
     !counts.data ? undefined : tab === "all" ? counts.data.pending + counts.data.approved + counts.data.rejected : counts.data[tab];
 
@@ -77,17 +145,13 @@ export function LibraryContentTab() {
               Files and notes tutors add to their subject cards. Nothing is shown to students until it is approved; edits of approved resources are reviewed again.
             </p>
           </div>
-          <div className="relative">
-            <Search size={14} aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              aria-label="Search library submissions"
-              placeholder="Search title or tutor"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-56 pl-8"
-            />
-          </div>
+          <SearchInput
+            label="Search library submissions"
+            placeholder="Search title or tutor"
+            value={search}
+            onChange={setSearch}
+            className="w-full sm:w-64"
+          />
         </div>
         <Tabs value={status} onValueChange={(next) => { setStatus(next as SubmissionFilter); setPage(1); }} className="px-5">
           <TabsList variant="line" aria-label="Submission status" className="h-auto flex-wrap justify-start">
@@ -103,82 +167,44 @@ export function LibraryContentTab() {
         </Tabs>
 
         <div className="border-t">
-          {list.isPending ? (
-            <div className="flex flex-col gap-2 p-5" role="status" aria-label="Loading">
-              {Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-            </div>
-          ) : list.isError ? (
+          {list.isError ? (
             <div className="p-5">
               <PanelMessage onRetry={() => void list.refetch()}>
                 The submissions could not be loaded. {describeApiError(list.error, "review library content").message}
               </PanelMessage>
             </div>
-          ) : list.data.rows.length === 0 ? (
-            <EmptyState
-              title={q ? "Nothing matches your search" : status === "pending" ? "Nothing waiting for review" : "No submissions here yet"}
-              description={status === "pending" && !q ? "New files and notes from tutors appear here." : undefined}
-            />
           ) : (
             <>
-              <Table>
-                <caption className="sr-only">{`${STATUS_LABELS[status]} library submissions, page ${page}`}</caption>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Resource</TableHead>
-                    <TableHead>Tutor</TableHead>
-                    <TableHead>Subject card</TableHead>
-                    <TableHead>Submitted</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-24"><span className="sr-only">Actions</span></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.data.rows.map((row) => (
-                    <TableRow key={row.id} className="cursor-pointer" onClick={() => setOpenId(row.id)}>
-                      <TableCell>
-                        <div className="flex min-w-0 items-start gap-2">
-                          {row.kind === "note" ? (
-                            <NotebookPen aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                          ) : (
-                            <FileText aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                          )}
-                          <div className="flex max-w-56 min-w-0 flex-col">
-                            <span className="flex flex-wrap items-center gap-2 font-medium break-words whitespace-normal">
-                              {row.title}
-                              {row.isEdit && <Badge variant="info">Edit</Badge>}
-                            </span>
-                            <span className="truncate text-xs text-muted-foreground">
-                              {row.kind === "note" ? "Note" : row.file?.name}
-                            </span>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex min-w-0 flex-col">
-                          <span className="font-medium">{row.faculty.fullName}</span>
-                          <span className="max-w-48 truncate text-xs text-muted-foreground" title={row.faculty.email}>{row.faculty.email}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex max-w-64 min-w-0 flex-col">
-                          <span className="font-medium">{row.card.subject}</span>
-                          <span className="truncate text-xs text-muted-foreground" title={row.card.pathLabel}>{row.card.pathLabel}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm whitespace-nowrap">{formatDateTime(row.submittedAt)}</TableCell>
-                      <TableCell><SubmissionStatusBadge status={row.status} /></TableCell>
-                      <TableCell>
-                        <Button size="sm" variant={row.status === "pending" ? "default" : "outline"}
-                          onClick={(e) => { e.stopPropagation(); setOpenId(row.id); }}
-                          aria-label={`${row.status === "pending" ? "Review" : "View"} ${row.title} by ${row.faculty.fullName}`}>
-                          {row.status === "pending" ? "Review" : "View"}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <TablePagination page={page} limit={LIMIT} total={list.data.total} noun="submissions" onPage={setPage} />
+              <DataTable
+                caption={`${STATUS_LABELS[status]} library submissions, page ${page}`}
+                columns={columns}
+                data={list.data?.rows ?? []}
+                getRowId={(row) => row.id}
+                loading={list.isPending}
+                loadingRows={5}
+                onRowClick={(row) => setOpenId(row.id)}
+                isRowSelected={(row) => row.id === openId}
+                empty={
+                  q
+                    ? "Nothing matches your search"
+                    : status === "pending"
+                      ? "Nothing waiting for review. New files and notes from tutors appear here."
+                      : "No submissions here yet"
+                }
+              />
+              {list.data && list.data.rows.length > 0 && (
+                <TablePagination
+                  noun="submissions"
+                  page={page}
+                  limit={limit}
+                  total={list.data.total}
+                  onPage={setPage}
+                  onLimit={(next) => {
+                    setLimit(next);
+                    setPage(1);
+                  }}
+                />
+              )}
             </>
           )}
         </div>
