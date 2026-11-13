@@ -48,6 +48,7 @@ import {
 import { awaitingKey, presetFor, visibleAwaiting } from "./awaiting-rows";
 import { PriceRuleDrawer, type TutorPricePreset } from "./price-rule-drawer";
 import { ResolutionPanel } from "./resolution-panel";
+import { SubjectCardReviewDialog, type CardUnderReview } from "./subject-card-review-dialog";
 
 const LIMIT = 20;
 const dateFormat = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
@@ -106,6 +107,9 @@ export function PricingPage() {
 
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const [deactivating, setDeactivating] = useState<PriceRule | null>(null);
+  // A subject card the tutor requested from their profile, being approved or rejected
+  const [cardReview, setCardReview] = useState<{ card: CardUnderReview; decision: "approve" | "reject" } | null>(null);
+  const canApproveCards = usePermission("faculty.approve");
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [edits, setEdits] = useState<PriceEdits>({});
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
@@ -155,6 +159,7 @@ export function PricingPage() {
   const rootName = filters.categoryId ? (roots.find((c) => c.id === filters.categoryId)?.name ?? null) : undefined;
   const newRows = visibleAwaiting(awaiting.data ?? [], { page: filters.page, status, q: filters.q, category: rootName });
   const awaitingTotal = awaiting.data?.length ?? 0;
+  const pendingCards = newRows.some((c) => c.cardStatus === "pending") || rows.some((r) => r.cardStatus === "pending");
   const rates = new Set(rows.map((r) => r.amounts.gstRateBps));
   const gstHeader = rates.size === 1 ? `GST ${formatBps([...rates][0])}` : "GST";
   const bulkMode = selected.size > 0;
@@ -268,9 +273,9 @@ export function PricingPage() {
             <CardDescription>
               {bulkMode
                 ? `Editing ${selected.size} selected rule${selected.size === 1 ? "" : "s"} — GST and student total recalculate on save`
-                : newRows.length
-                  ? "Rows marked Not priced are tutors' subject cards without a price; the tutor can sign in once each has one. Select rows or click a session price to edit it."
-                  : "Select rules or click a session price to edit it. Student pays the session price plus GST."}
+                : `${newRows.length
+                    ? "Rows marked Not priced are tutors' subject cards without a price; the tutor can sign in once each has one. Select rows or click a session price to edit it."
+                    : "Select rules or click a session price to edit it. Student pays the session price plus GST."}${pendingCards ? " Pending approval: subject cards tutors added from their profile; price them, then approve them from the row menu." : ""}`}
             </CardDescription>
           </div>
           {bulkMode && (
@@ -391,6 +396,11 @@ export function PricingPage() {
                       onEditPrice={() => editNewPrice(card)}
                       onInput={(input) => setInput(key, input)}
                       onSetPrice={() => setDrawer({ preset: presetFor(card) })}
+                      onRejectCard={
+                        canApproveCards && card.cardStatus === "pending"
+                          ? () => setCardReview({ decision: "reject", card: cardFromAwaiting(card) })
+                          : undefined
+                      }
                     />
                   );
                 })}
@@ -408,6 +418,11 @@ export function PricingPage() {
                     onInput={(input) => setInput(rule.id, input)}
                     onEdit={() => setDrawer({ rule })}
                     onDeactivate={() => setDeactivating(rule)}
+                    onReviewCard={
+                      canApproveCards && rule.cardStatus === "pending" && rule.cardId && rule.facultyId
+                        ? (decision) => setCardReview({ decision, card: cardFromRule(rule) })
+                        : undefined
+                    }
                   />
                 ))}
               </TableBody>
@@ -466,6 +481,14 @@ export function PricingPage() {
         />
       )}
       {deactivating && <DeactivateDialog rule={deactivating} onClose={() => setDeactivating(null)} />}
+      {cardReview && (
+        <SubjectCardReviewDialog
+          key={`${cardReview.card.cardId}-${cardReview.decision}`}
+          card={cardReview.card}
+          decision={cardReview.decision}
+          onClose={() => setCardReview(null)}
+        />
+      )}
       <ConfirmDialog
         open={confirmClear}
         title="Discard price changes?"
@@ -494,6 +517,7 @@ function PriceRow({
   onEditPrice,
   onEdit,
   onDeactivate,
+  onReviewCard,
 }: {
   rule: PriceRule;
   canManage: boolean;
@@ -506,6 +530,8 @@ function PriceRow({
   onEditPrice: () => void;
   onEdit: () => void;
   onDeactivate: () => void;
+  /** Present for a pending subject card the admin may approve or reject */
+  onReviewCard?: (decision: "approve" | "reject") => void;
 }) {
   const parsed = edit ? parseRupeesToPaise(edit.input) : undefined;
   // Edited rows show a muted preview; saved rows show the server's amounts
@@ -534,6 +560,11 @@ function PriceRow({
         {!rule.isActive && (
           <Badge variant="secondary" className="ml-2">
             Inactive
+          </Badge>
+        )}
+        {rule.cardStatus === "pending" && (
+          <Badge variant="info" className="ml-2" title="Requested from the tutor's profile; approve it once priced">
+            Pending approval
           </Badge>
         )}
       </TableCell>
@@ -587,6 +618,16 @@ function PriceRow({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={onEdit}>Edit price</DropdownMenuItem>
+              {onReviewCard && (
+                <>
+                  <DropdownMenuItem onSelect={() => onReviewCard("approve")} disabled={!rule.isActive}>
+                    Approve subject card
+                  </DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive" onSelect={() => onReviewCard("reject")}>
+                    Reject subject card
+                  </DropdownMenuItem>
+                </>
+              )}
               {rule.isActive && (
                 <DropdownMenuItem variant="destructive" onSelect={onDeactivate}>
                   Deactivate
@@ -615,6 +656,7 @@ function NewPriceRow({
   onEditPrice,
   onInput,
   onSetPrice,
+  onRejectCard,
 }: {
   card: AwaitingPrice;
   canManage: boolean;
@@ -626,6 +668,8 @@ function NewPriceRow({
   onEditPrice: () => void;
   onInput: (value: string) => void;
   onSetPrice: () => void;
+  /** Present for a pending card requested from the profile (approve once it has a price) */
+  onRejectCard?: () => void;
 }) {
   const parsed = edit?.input.trim() ? parseRupeesToPaise(edit.input) : undefined;
   const preview = parsed?.ok && parsed.paise > 0 ? previewStudentPays(parsed.paise, card.defaultPrice?.gstRateBps ?? DEFAULT_GST_BPS) : null;
@@ -650,6 +694,11 @@ function NewPriceRow({
         <Badge variant="warning" className="ml-2">
           Not priced
         </Badge>
+        {card.cardStatus === "pending" && (
+          <Badge variant="info" className="ml-2" title="Requested from the tutor's profile; set the price, then approve it">
+            Pending approval
+          </Badge>
+        )}
       </TableCell>
       <TableCell>
         <div className="flex min-w-0 flex-col">
@@ -700,12 +749,44 @@ function NewPriceRow({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={onSetPrice}>Set price</DropdownMenuItem>
+              {onRejectCard && (
+                <>
+                  <DropdownMenuItem disabled title="Set the price first">
+                    Approve subject card
+                  </DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive" onSelect={onRejectCard}>
+                    Reject subject card
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
       )}
     </TableRow>
   );
+}
+
+function cardFromRule(rule: PriceRule): CardUnderReview {
+  return {
+    facultyId: rule.facultyId as string,
+    cardId: rule.cardId as string,
+    tutor: rule.facultyName ?? "Unknown tutor",
+    subject: rule.subjectName,
+    pathLabel: rule.pathLabel,
+    priced: rule.isActive,
+  };
+}
+
+function cardFromAwaiting(card: AwaitingPrice): CardUnderReview {
+  return {
+    facultyId: card.facultyId,
+    cardId: card.cardId,
+    tutor: card.facultyName,
+    subject: card.subject,
+    pathLabel: card.pathLabel,
+    priced: false,
+  };
 }
 
 function DeactivateDialog({ rule, onClose }: { rule: PriceRule; onClose: () => void }) {
