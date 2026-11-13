@@ -139,17 +139,46 @@ export function SettingPhoneInput({ error, ...props }: Omit<PhoneInputProps, "in
 }
 
 /** A native select styled like the inputs; the profile time-zone list is long and benefits from native search. */
-export function SettingSelect({ className, ...props }: ComponentProps<"select">) {
+
+export function SettingSelect({
+  className,
+  ...props
+}: ComponentProps<"select">) {
   return (
     <select
       {...props}
       className={cn(
-        "h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-base font-semibold outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        // Layout
+        "h-10 w-full rounded-md border border-input",
+        "bg-card px-3 py-2 text-base font-semibold",
+
+        // Interaction
+        "cursor-pointer",
+        "transition-all duration-200 ease-in-out",
+        "hover:border-foreground/25",
+        "active:border-ring",
+        "motion-reduce:transition-none",
+
+        // Focus
+        "outline-none",
+        "focus-visible:border-ring",
+        "focus-visible:ring-[3px] focus-visible:ring-ring/50",
+
+        // Disabled
+        "disabled:pointer-events-none",
+        "disabled:cursor-not-allowed",
+        "disabled:opacity-50",
+
+        // Invalid
+        "aria-invalid:border-destructive",
+        "aria-invalid:ring-destructive/20",
+
         className,
       )}
     />
   );
 }
+
 
 export function SettingButton({
   variant = "secondary",
