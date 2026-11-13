@@ -7,7 +7,7 @@
 - **Auth and registration:** the brand panel is hidden below `lg`. From `lg` the page is one screen tall (`lg:h-dvh lg:overflow-hidden`): the panel keeps its size and only the form column scrolls (`AuthPage`). Below `lg` the whole page scrolls. Do not make the brand side depend on the form's height.
 - **Grids:** `grid-cols-1` on phones, `sm:grid-cols-2` for pairs; wrap action rows with `flex-wrap`; `PageHeader` already wraps title and actions.
 - **No fixed widths that exceed the screen.** Use `w-full max-w-*` or `min(…, 100vw - 2rem)`. Dialogs and sheets keep a side gutter and scroll inside; tables sit in a horizontally scrollable container (`DataTable` handles this); long text uses `min-w-0` and `truncate`.
-- **Touch:** interactive targets are at least the size of the existing controls (buttons and inputs `h-10`, nav rows `h-11`); icon-only buttons use `size-8` or larger with an `aria-label`. Hover is never the only way to reach something.
+- **Touch:** interactive targets are at least the size of the existing controls (buttons and inputs `h-10`, nav rows `h-11`); icon-only buttons use `size-8` or larger with an `aria-label`. Hover is never the only way to reach something (hover-revealed buttons such as `CopyValue` also show on keyboard focus and on touch screens).
 - **Verify** at about 1440px and 390px (the admin screens were checked at those widths) and, for layouts with a `lg` switch, at 1024px.
 
 ## Accessibility

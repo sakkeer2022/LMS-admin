@@ -2,6 +2,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { CheckCircle2, Download, Eye, FilePenLine, FileSignature, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { CopyValue } from "@/components/feedback/copy-button";
+import { PersonAvatar } from "@/components/feedback/person-avatar";
 import { ConfirmDialog } from "@/components/forms/confirm-dialog";
 import { FormError, TextareaField } from "@/components/forms/field";
 import { PanelMessage } from "@/components/layout/panel-message";
@@ -144,12 +146,26 @@ export function ReviewView({ detail, onClose }: { detail: FacultyDetail; onClose
 
   return (
     <>
-      <SheetHeader className="border-b">
-        <SheetTitle className="text-lg">{detail.fullName}</SheetTitle>
-        <SheetDescription>
-          {[detail.applicationReference, detail.email].filter(Boolean).join(" · ")}
-        </SheetDescription>
-        <div className="flex flex-wrap items-center gap-1 pt-1">
+      <SheetHeader className="gap-3 border-b bg-accent/40 pr-12">
+        <div className="flex items-center gap-3">
+          <PersonAvatar name={detail.fullName} size="lg" />
+          <div className="flex min-w-0 flex-col">
+            <SheetTitle className="truncate text-lg">{detail.fullName}</SheetTitle>
+            <SheetDescription asChild>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5">
+                <CopyValue value={detail.email} label="Email">
+                  <span className="truncate">{detail.email}</span>
+                </CopyValue>
+                {detail.applicationReference && (
+                  <CopyValue value={detail.applicationReference} label="Application reference">
+                    <span className="font-mono text-xs">{detail.applicationReference}</span>
+                  </CopyValue>
+                )}
+              </div>
+            </SheetDescription>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
           <VerificationBadge status={detail.verification} />
           <FacultyStatusBadge status={detail.status} />
           <PricingBadge status={detail.pricing} />
@@ -166,7 +182,7 @@ export function ReviewView({ detail, onClose }: { detail: FacultyDetail; onClose
             value={detail.screening.teachingMode?.label ?? (detail.screening.offersOfflineClasses ? "Offers offline classes" : "Online")}
           />
           <Fact label="City" value={detail.city} />
-          <Fact label="Mobile" value={detail.mobileNumber} />
+          <Fact label="Mobile" value={detail.mobileNumber ? <CopyValue value={detail.mobileNumber} label="Mobile number" /> : null} />
           <Fact label="Submitted" value={detail.submittedAt ? formatShortDate(detail.submittedAt) : formatShortDate(detail.appliedAt)} />
         </dl>
       </Section>

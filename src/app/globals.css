@@ -140,4 +140,17 @@
   body {
     @apply bg-background font-sans text-sm text-foreground antialiased;
   }
+  /* Tailwind 4 resets buttons to the default cursor; anything pressable shows the hand */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="option"],
+  [role="menuitem"],
+  [role="checkbox"],
+  [role="switch"],
+  select:not(:disabled),
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
 }

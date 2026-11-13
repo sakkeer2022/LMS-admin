@@ -10,6 +10,7 @@ import {
   projectDrop, relocation, rowCount, rowCountLabel, searchMatches, uniqueSiblingCode, visibleRows,
 } from '../src/lib/api/category-tree-model';
 import { Switch } from '../src/components/shadcn/switch';
+import { TooltipProvider } from '../src/components/shadcn/tooltip';
 import { CategoryTreeList } from '../src/features/category-tree/components/category-tree-list';
 import { PermissionProvider } from '../src/components/security/permission-provider';
 import { leafSubjectSchema } from '../src/lib/api/category-tree';
@@ -164,10 +165,10 @@ describe('drag and drop (reorder mode)', () => {
 
 describe('category tree list', () => {
   const rows = visibleRows(buildTree(nodes), new Set([academic.id, school.id]));
-  const render = (reorder: boolean, canManage = true) => renderToStaticMarkup(<CategoryTreeList rows={rows} nodes={nodes}
+  const render = (reorder: boolean, canManage = true) => renderToStaticMarkup(<TooltipProvider><CategoryTreeList rows={rows} nodes={nodes}
     expanded={new Set([academic.id, school.id])} onToggle={() => undefined} selectedId={k12.id} onSelect={() => undefined} reorder={reorder}
     onRelocate={() => undefined} onInvalidDrop={() => undefined} canManage={canManage} pendingIds={new Set([university.id])}
-    onEdit={() => undefined} onDelete={() => undefined} onToggleActive={() => undefined} />);
+    onEdit={() => undefined} onDelete={() => undefined} onToggleActive={() => undefined} /></TooltipProvider>);
 
   it('shows the switch, Edit and Delete only on the selected row, as in the design', () => {
     const html = render(false);

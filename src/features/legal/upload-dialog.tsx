@@ -5,14 +5,12 @@ import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/forms/DatePicker";
-import {
-  SettingButton,
-  SettingDialog,
-  SettingField,
-  SettingForm,
-  SettingInput,
-  SettingSelect,
-} from "@/components/settings/setting-layout";
+import { Field, SelectField, TextField } from "@/components/forms/field";
+import { Form } from "@/components/forms/form";
+import { FormDialog } from "@/components/forms/form-dialog";
+import { PendingButton } from "@/components/forms/pending-button";
+import { Button } from "@/components/shadcn/button";
+import { Input } from "@/components/shadcn/input";
 import { ApiError } from "@/lib/api/contracts";
 import { toIsoDate } from "@/lib/dates";
 import { useUploadPolicy } from "./api";
@@ -94,133 +92,74 @@ export function UploadPolicyDialog({
   });
 
   return (
-    <SettingDialog
+    <FormDialog
       open={open}
-      onClose={() => !upload.isPending && onClose()}
+      onClose={onClose}
+      busy={upload.isPending}
       title="Upload a new version"
       description="It becomes the version students see as soon as it is saved. The previous one stays on record."
-      icon={<FileUp size={20} aria-hidden />}
       footer={
         <>
-          <SettingButton
-            variant="ghost"
-            onClick={onClose}
-            disabled={upload.isPending}
-          >
+          <Button variant="outline" onClick={onClose} disabled={upload.isPending}>
             Cancel
-          </SettingButton>
-          <SettingButton
-            variant="primary"
-            type="submit"
-            form="upload-policy-form"
-            pending={upload.isPending}
-            pendingLabel="Uploading…"
-          >
+          </Button>
+          <PendingButton type="submit" form="upload-policy-form" pending={upload.isPending} pendingLabel="Uploading…">
+            <FileUp aria-hidden />
             Upload
-          </SettingButton>
+          </PendingButton>
         </>
       }
     >
-      <SettingForm
-        id="upload-policy-form"
-        onSubmit={(event) => void submit(event)}
-        noValidate
-        pending={upload.isPending}
-      >
+      <Form id="upload-policy-form" onSubmit={(event) => void submit(event)} noValidate pending={upload.isPending}>
         <div className="flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <SettingField label="Document" htmlFor="policy-type">
-              <SettingSelect
-                id="policy-type"
-                className="text-sm"
-                {...register("type")}
-              >
-                {POLICY_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {POLICY_LABELS[type]}
-                  </option>
-                ))}
-              </SettingSelect>
-            </SettingField>
-            <SettingField label="Country" htmlFor="policy-country">
-              <SettingSelect
-                id="policy-country"
-                {...register("country")}
-                aria-invalid={Boolean(errors.country)}
-              >
-                {countries.map((country) => (
-                  <option key={country.code} value={country.code}>
-                    {country.name}
-                  </option>
-                ))}
-              </SettingSelect>
-            </SettingField>
+            <SelectField label="Document" {...register("type")}>
+              {POLICY_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {POLICY_LABELS[type]}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField label="Country" error={errors.country?.message} {...register("country")}>
+              {countries.map((country) => (
+                <option key={country.code} value={country.code}>
+                  {country.name}
+                </option>
+              ))}
+            </SelectField>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <SettingField label="Version" htmlFor="policy-version">
-              <SettingInput
-                id="policy-version"
-                placeholder="1.0"
-                error={errors.version?.message}
-                {...register("version")}
-              />
-            </SettingField>
-            <SettingField label="Takes effect" htmlFor="policy-effective">
-              <Controller
-                control={control}
-                name="effectiveAt"
-                render={({ field }) => (
-                  <div className="rounded-md border border-input bg-card">
-                    <DatePicker
-                      id="policy-effective"
-                      name="effectiveAt"
-                      value={field.value}
-                      onChange={field.onChange}
-                      invalid={Boolean(errors.effectiveAt)}
-                    />
-                  </div>
-                )}
-              />
-              {errors.effectiveAt && (
-                <p className="text-xs text-error-foreground">
-                  {errors.effectiveAt.message}
-                </p>
+            <TextField label="Version" placeholder="1.0" error={errors.version?.message} {...register("version")} />
+            <Controller
+              control={control}
+              name="effectiveAt"
+              render={({ field }) => (
+                <Field label="Takes effect" error={errors.effectiveAt?.message}>
+                  {({ id, invalid }) => (
+                    <div className="rounded-md border border-input bg-card">
+                      <DatePicker id={id} name="effectiveAt" value={field.value} onChange={field.onChange} invalid={invalid} />
+                    </div>
+                  )}
+                </Field>
               )}
-            </SettingField>
+            />
           </div>
-          <SettingField label="Title" htmlFor="policy-title">
-            <SettingInput
-              id="policy-title"
-              error={errors.title?.message}
-              {...register("title")}
-            />
-          </SettingField>
-          <SettingField label="PDF file" htmlFor="policy-file">
-            <input
-              id="policy-file"
-              type="file"
-              accept="application/pdf,.pdf"
-              aria-invalid={Boolean(errors.file)}
-              onChange={(event) =>
-                setValue("file", event.target.files?.[0] ?? null, {
-                  shouldValidate: true,
-                })
-              }
-              className="block w-full cursor-pointer rounded-md border border-input bg-card text-sm file:mr-3 file:cursor-pointer file:border-0 file:bg-accent file:px-3 file:py-2 file:text-sm file:font-semibold file:text-accent-foreground"
-            />
-            {file && (
-              <p className="text-xs text-text-secondary">
-                {(file.size / 1024).toFixed(0)} KB
-              </p>
+          <TextField label="Title" error={errors.title?.message} {...register("title")} />
+          <Field label="PDF file" hint={file ? `${(file.size / 1024).toFixed(0)} KB` : undefined} error={errors.file?.message}>
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                type="file"
+                accept="application/pdf,.pdf"
+                aria-describedby={describedBy}
+                aria-invalid={invalid || undefined}
+                onChange={(event) => setValue("file", event.target.files?.[0] ?? null, { shouldValidate: true })}
+                className="h-auto cursor-pointer p-0 file:mr-3 file:h-10 file:cursor-pointer file:bg-accent file:px-3 file:font-semibold file:text-accent-foreground"
+              />
             )}
-            {errors.file && (
-              <p className="text-xs text-error-foreground">
-                {errors.file.message}
-              </p>
-            )}
-          </SettingField>
+          </Field>
         </div>
-      </SettingForm>
-    </SettingDialog>
+      </Form>
+    </FormDialog>
   );
 }

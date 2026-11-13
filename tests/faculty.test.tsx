@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup as renderMarkup } from "react-dom/server";
+import type { ReactElement } from "react";
+import { TooltipProvider } from "../src/components/shadcn/tooltip";
+
+// Row menus and copy buttons use tooltips, which need their provider (the app supplies it in providers.tsx)
+const renderToStaticMarkup = (ui: ReactElement) => renderMarkup(<TooltipProvider>{ui}</TooltipProvider>);
 import {
   EMAIL_PATTERN,
   MAX_INVITES_PER_REQUEST,
@@ -162,7 +167,7 @@ describe("email chips", () => {
 
 describe("URL filters", () => {
   it("defaults to the All tab, newest first, page 1", () => {
-    expect(filtersFromParams(new URLSearchParams())).toEqual({ tab: "all", sort: "recent", page: 1 });
+    expect(filtersFromParams(new URLSearchParams())).toEqual({ tab: "all", sort: "recent", page: 1, limit: 20 });
   });
   it("accepts the dashboard's capitalised filter and ignores junk", () => {
     expect(filtersFromParams(new URLSearchParams("filter=Pending&page=3&sort=name"))).toMatchObject({
@@ -174,20 +179,25 @@ describe("URL filters", () => {
       tab: "all",
       sort: "recent",
       page: 1,
+      limit: 20,
     });
+  });
+  it("accepts only the shared page sizes", () => {
+    expect(filtersFromParams(new URLSearchParams("limit=50")).limit).toBe(50);
+    expect(filtersFromParams(new URLSearchParams("limit=7")).limit).toBe(20);
   });
   it("keeps a valid category and search", () => {
     const f = filtersFromParams(new URLSearchParams("category=8c121988-8afa-4fb7-b6eb-9b0dcb94f730&search=%20rao%20"));
     expect(f).toMatchObject({ categoryId: "8c121988-8afa-4fb7-b6eb-9b0dcb94f730", search: "rao" });
   });
-  it("builds the list query with a page size of 7", () => {
-    expect(listQuery({ tab: "verified", sort: "oldest", page: 2 })).toEqual({
+  it("builds the list query with the default page size of 20", () => {
+    expect(listQuery({ tab: "verified", sort: "oldest", page: 2, limit: 20 })).toEqual({
       status: "verified",
       sort: "oldest",
       categoryId: undefined,
       search: undefined,
       page: "2",
-      limit: "7",
+      limit: "20",
     });
   });
 });
@@ -213,8 +223,8 @@ describe("row presentation", () => {
   it("summarises the header and the footer", () => {
     expect(headerSummary({ all: 118, pending: 7 })).toBe("118 tutor profiles · 7 awaiting verification");
     expect(headerSummary({ all: 1, pending: 0 })).toBe("1 tutor profile · 0 awaiting verification");
-    expect(rangeLabel(1, 118)).toBe("Showing 1–7 of 118 tutors");
-    expect(rangeLabel(17, 118)).toBe("Showing 113–118 of 118 tutors");
+    expect(rangeLabel(1, 118)).toBe("Showing 1–20 of 118 tutors");
+    expect(rangeLabel(6, 118)).toBe("Showing 101–118 of 118 tutors");
     expect(rangeLabel(1, 0)).toBe("Showing 0–0 of 0 tutors");
     expect(rangeLabel(1, 1)).toBe("Showing 1–1 of 1 tutor");
   });
@@ -240,10 +250,10 @@ describe("row presentation", () => {
     expect(canDecide({ approvalStatus: "rejected" })).toBe(false);
   });
   it("explains empty results", () => {
-    expect(emptyMessage({ tab: "all", sort: "recent", page: 1 })).toBe("No tutors yet. Invite a tutor to start onboarding.");
-    expect(emptyMessage({ tab: "suspended", sort: "recent", page: 1 })).toBe("No suspended tutors.");
-    expect(emptyMessage({ tab: "pending", sort: "recent", page: 1, search: "rao" })).toBe('No tutors match "rao".');
-    expect(emptyMessage({ tab: "all", sort: "recent", page: 1, categoryId: "c" })).toBe(
+    expect(emptyMessage({ tab: "all", sort: "recent", page: 1, limit: 20 })).toBe("No tutors yet. Invite a tutor to start onboarding.");
+    expect(emptyMessage({ tab: "suspended", sort: "recent", page: 1, limit: 20 })).toBe("No suspended tutors.");
+    expect(emptyMessage({ tab: "pending", sort: "recent", page: 1, limit: 20, search: "rao" })).toBe('No tutors match "rao".');
+    expect(emptyMessage({ tab: "all", sort: "recent", page: 1, limit: 20, categoryId: "c" })).toBe(
       "No tutors are assigned to this category yet.",
     );
   });

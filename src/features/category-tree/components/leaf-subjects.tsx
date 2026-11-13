@@ -1,7 +1,7 @@
 "use client";
 import { useState, type FormEvent } from 'react';
 import { TextField } from '@/components/forms/field';
-import { Badge } from '@/components/shadcn/badge';
+import { StatusBadge } from '@/components/feedback/status-badge';
 import { Button } from '@/components/shadcn/button';
 import { Skeleton } from '@/components/shadcn/skeleton';
 import { Switch } from '@/components/shadcn/switch';
@@ -61,7 +61,7 @@ export function LeafSubjects({ categoryId, canManage }: { categoryId: string; ca
                 <span className="text-sm font-medium break-words">{s.name}</span>
                 <span className="text-xs text-muted-foreground">
                   {usage(s) || 'Not used yet'}
-                  {!s.subjectActive && <> · <Badge variant="warning">Off everywhere</Badge></>}
+                  {!s.subjectActive && <> · <StatusBadge status="inactive">Off everywhere</StatusBadge></>}
                 </span>
               </div>
               {canManage && <div className="flex shrink-0 items-center gap-2">

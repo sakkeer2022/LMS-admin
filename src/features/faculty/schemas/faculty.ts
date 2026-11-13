@@ -182,7 +182,9 @@ export const SORT_LABELS: Record<FacultySort, string> = {
   name: "Name (A–Z)",
 };
 
-export const PAGE_SIZE = 7;
+/** The default rows per page, the same as every listing; 10, 20 and 50 can be chosen */
+export const PAGE_SIZE = 20;
+const PAGE_SIZE_CHOICES = [10, 20, 50];
 
 // ── URL state ───────────────────────────────────────────────────────
 
@@ -198,12 +200,14 @@ export function filtersFromParams(params: URLSearchParams): FacultyFilters {
   const category = params.get("category") ?? "";
   const search = params.get("search")?.trim() ?? "";
   const page = Number(params.get("page"));
+  const limit = Number(params.get("limit"));
   return {
     tab: (FACULTY_TABS as readonly string[]).includes(tab) ? (tab as FacultyTab) : "all",
     sort: (FACULTY_SORTS as readonly string[]).includes(sort) ? (sort as FacultySort) : "recent",
     ...(uuid.safeParse(category).success && { categoryId: category }),
     ...(search && { search: search.slice(0, 100) }),
     page: Number.isInteger(page) && page > 0 ? page : 1,
+    limit: PAGE_SIZE_CHOICES.includes(limit) ? limit : PAGE_SIZE,
   };
 }
 
@@ -215,7 +219,7 @@ export function listQuery(filters: FacultyFilters) {
     categoryId: filters.categoryId,
     search: filters.search,
     page: String(filters.page),
-    limit: String(PAGE_SIZE),
+    limit: String(filters.limit),
   };
 }
 

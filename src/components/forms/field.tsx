@@ -5,6 +5,7 @@ import { Input } from "@/components/shadcn/input";
 import { Label } from "@/components/shadcn/label";
 import { NativeSelect } from "@/components/shadcn/native-select";
 import { Textarea } from "@/components/shadcn/textarea";
+import { PasswordInput } from "./password-input";
 import { cn } from "@/lib/utils";
 
 /** Label, control, hint and error stacked; ids wired for screen readers. */
@@ -54,6 +55,17 @@ export function TextField({ label, hint, error, labelHidden, containerClassName,
     <Field label={label} hint={hint} error={error} labelHidden={labelHidden} className={containerClassName}>
       {({ id, describedBy, invalid }) => (
         <Input id={id} aria-describedby={describedBy} aria-invalid={invalid || undefined} {...props} />
+      )}
+    </Field>
+  );
+}
+
+/** A labelled password input with a show/hide toggle. */
+export function PasswordField({ label, hint, error, labelHidden, containerClassName, ...props }: FieldProps & Omit<ComponentProps<"input">, "id" | "type">) {
+  return (
+    <Field label={label} hint={hint} error={error} labelHidden={labelHidden} className={containerClassName}>
+      {({ id, describedBy, invalid }) => (
+        <PasswordInput id={id} aria-describedby={describedBy} aria-invalid={invalid || undefined} {...props} />
       )}
     </Field>
   );

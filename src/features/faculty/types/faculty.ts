@@ -84,6 +84,8 @@ export interface FacultyFilters {
   sort: FacultySort;
   search?: string;
   page: number;
+  /** Rows per page; the same 10, 20 or 50 as every listing */
+  limit: number;
 }
 
 export type FacultyRowAction = "view" | "edit" | "activate" | "deactivate" | "delete" | "resend" | "revoke";

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup as renderMarkup } from "react-dom/server";
+import type { ReactElement } from "react";
+import { TooltipProvider } from "../src/components/shadcn/tooltip";
+
+// Row menus and copy buttons use tooltips, which need their provider (the app supplies it in providers.tsx)
+const renderToStaticMarkup = (ui: ReactElement) => renderMarkup(<TooltipProvider>{ui}</TooltipProvider>);
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PermissionProvider } from "../src/components/security/permission-provider";
 import { Sheet } from "../src/components/shadcn/sheet";

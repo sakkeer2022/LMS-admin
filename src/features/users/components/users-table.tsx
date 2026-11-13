@@ -1,10 +1,13 @@
 "use client";
 import { useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "@/components/shadcn/badge";
+import { Download } from "lucide-react";
+import { CopyValue } from "@/components/feedback/copy-button";
+import { PersonAvatar } from "@/components/feedback/person-avatar";
+import { StatusBadge } from "@/components/feedback/status-badge";
+import { SearchInput } from "@/components/forms/search-input";
 import { Button } from "@/components/shadcn/button";
 import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
-import { Input } from "@/components/shadcn/input";
 import { DataTable } from "@/components/data-table/data-table";
 import { TablePagination } from "@/components/data-table/table-pagination";
 import { PanelMessage } from "@/components/layout/panel-message";
@@ -14,23 +17,34 @@ import { exportCSV } from "@/lib/exports/download";
 import { useUsers } from "../api/users";
 import type { UserSummary } from "../types/user";
 
-const LIMIT = 20;
-
 const columns: ColumnDef<UserSummary>[] = [
   {
     accessorKey: "fullName",
     header: "Name",
-    cell: ({ getValue }) => <span className="font-semibold">{getValue<string>()}</span>,
+    cell: ({ getValue }) => (
+      <span className="flex items-center gap-3">
+        <PersonAvatar name={getValue<string>()} />
+        <span title={getValue<string>()} className="max-w-64 truncate font-semibold">
+          {getValue<string>()}
+        </span>
+      </span>
+    ),
   },
-  { accessorKey: "email", header: "Email" },
+  {
+    accessorKey: "email",
+    header: "Email",
+    cell: ({ getValue }) => (
+      <CopyValue value={getValue<string>()} label="Email" className="text-text-secondary" />
+    ),
+  },
   {
     accessorKey: "isActive",
     header: "Status",
     cell: ({ getValue }) =>
       getValue<boolean>() ? (
-        <Badge variant="success">Active</Badge>
+        <StatusBadge status="active">Active</StatusBadge>
       ) : (
-        <Badge variant="secondary">Disabled</Badge>
+        <StatusBadge status="inactive">Disabled</StatusBadge>
       ),
   },
 ];
@@ -38,8 +52,9 @@ const columns: ColumnDef<UserSummary>[] = [
 export function UsersTable() {
   const allowed = usePermission("user.read");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
   const [search, setSearch] = useState("");
-  const query = useUsers({ page, limit: LIMIT, search }, allowed);
+  const query = useUsers({ page, limit, search }, allowed);
   if (!allowed)
     return <PanelMessage>Requires user.read permission.</PanelMessage>;
   return (
@@ -50,14 +65,13 @@ export function UsersTable() {
           <CardTitle>Platform users</CardTitle>
           <CardDescription>Search by name or email</CardDescription>
           <CardAction className="flex items-center gap-2">
-            <Input
-              type="search"
-              aria-label="Search users"
+            <SearchInput
+              label="Search users"
               placeholder="Search users"
               className="w-56"
               value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
+              onChange={(next) => {
+                setSearch(next);
                 setPage(1);
               }}
             />
@@ -78,6 +92,7 @@ export function UsersTable() {
                 )
               }
             >
+              <Download aria-hidden />
               Export current page CSV
             </Button>
           </CardAction>
@@ -94,15 +109,19 @@ export function UsersTable() {
               data={query.data?.data ?? []}
               getRowId={(user) => user.id}
               loading={query.isPending}
-              empty="No users found."
+              empty={search ? `No users match "${search}". Try a different name or email.` : "No users yet."}
             />
             {query.data && (
               <TablePagination
                 page={page}
-                limit={LIMIT}
+                limit={limit}
                 total={query.data.meta?.total ?? query.data.data.length}
                 noun="users"
                 onPage={setPage}
+                onLimit={(next) => {
+                  setLimit(next);
+                  setPage(1);
+                }}
               />
             )}
           </>
