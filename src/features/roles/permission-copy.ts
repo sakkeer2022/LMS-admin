@@ -51,8 +51,8 @@ const AREAS: Record<string, Area> = {
     icon: Settings,
   },
   faculty: {
-    title: "Tutors",
-    blurb: "Inviting, reviewing and approving tutors",
+    title: "Faculty",
+    blurb: "Inviting, reviewing and approving faculty",
     icon: GraduationCap,
   },
   feature_flags: {
@@ -61,8 +61,8 @@ const AREAS: Record<string, Area> = {
     icon: ToggleLeft,
   },
   library: {
-    title: "Tutor library",
-    blurb: "Reviewing material tutors upload",
+    title: "Faculty library",
+    blurb: "Reviewing material faculty upload",
     icon: BookOpen,
   },
   notifications: {
@@ -140,20 +140,20 @@ const WORDS: Record<string, Words> = {
     summary: "Edit the business settings that apply everywhere",
   },
   "faculty.read": {
-    label: "See tutors",
-    summary: "View tutor profiles and invitations",
+    label: "See faculty",
+    summary: "View faculty profiles and invitations",
   },
   "faculty.create": {
-    label: "Invite tutors",
-    summary: "Send invitations and create tutor accounts",
+    label: "Invite faculty",
+    summary: "Send invitations and create faculty accounts",
   },
   "faculty.approve": {
-    label: "Approve tutor applications",
-    summary: "Verify documents, then approve or reject a tutor",
+    label: "Approve faculty applications",
+    summary: "Verify documents, then approve or reject a faculty member",
   },
   "faculty.documents": {
-    label: "Open tutor documents",
-    summary: "View the private documents tutors upload to prove who they are",
+    label: "Open faculty documents",
+    summary: "View the private documents faculty upload to prove who they are",
     risk: "sensitive",
   },
   "feature_flags.read": {
@@ -173,8 +173,8 @@ const WORDS: Record<string, Words> = {
     summary: "Delete a feature switch",
   },
   "library.moderate": {
-    label: "Review tutor library material",
-    summary: "Approve or reject what tutors add to their library",
+    label: "Review faculty library material",
+    summary: "Approve or reject what faculty add to their library",
   },
   "notifications.read": {
     label: "See notifications",
@@ -283,7 +283,7 @@ export function wordsFor(p: PermissionItem): Words {
   );
 }
 
-/** Portal-only permissions (a tutor's own profile) are not for admin roles. */
+/** Portal-only permissions (a faculty member's own profile) are not for admin roles. */
 export const forAdminRoles = (p: PermissionItem) => !p.name.endsWith("_self");
 
 /** A read is "view"; anything else changes something. */

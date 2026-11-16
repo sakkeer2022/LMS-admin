@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Download, History, SearchX, X } from "lucide-react";
+import { Download, History, SearchX, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable } from "@/components/data-table/data-table";
 import { TablePagination } from "@/components/data-table/table-pagination";
@@ -17,6 +17,7 @@ import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
 import { Card } from "@/components/shadcn/card";
 import { Input } from "@/components/shadcn/input";
+import { FilterSelect } from "@/features/students/students-filters";
 import { NativeSelect } from "@/components/shadcn/native-select";
 import {
   Sheet,
@@ -31,11 +32,11 @@ import {
   EXPORT_LIMIT,
   useActorNames,
   useAudit,
+  useStaffOptions,
 } from "./api";
 import { DiffView } from "./diff-view";
 import {
   NO_AUDIT_FILTERS,
-  isUuid,
   windowError,
   type AuditEvent,
   type AuditFilters,
@@ -63,16 +64,21 @@ export function ActivityPage() {
   const [exporting, setExporting] = useState(false);
 
   const rangeError = windowError(filters);
-  const actorError =
-    filters.actorId && !isUuid(filters.actorId)
-      ? "Use a user id (open an entry and choose “Only this user”)."
-      : undefined;
-  const valid = !rangeError && !actorError;
+  const valid = !rangeError;
+  const staff = useStaffOptions(allowed && canSeeUsers);
   const query = useAudit(filters, page, limit, allowed && valid);
   const rows = query.data?.data ?? [];
-  const names = useActorNames(
+  const fetched = useActorNames(
     rows.flatMap((r) => (r.actorId ? [r.actorId] : [])),
     allowed && canSeeUsers,
+  );
+  const names = useMemo(
+    () =>
+      new Map([
+        ...(staff.data ?? []).map((u) => [u.id, u.fullName] as const),
+        ...fetched,
+      ]),
+    [staff.data, fetched],
   );
   const actor = (id: string | null) =>
     id ? (names.get(id) ?? `${id.slice(0, 8)}…`) : "System";
@@ -254,24 +260,28 @@ export function ActivityPage() {
               />
             )}
           </Field>
-          <Field label="User id" error={actorError}>
-            {({ id, describedBy, invalid }) => (
-              <Input
-                id={id}
-                placeholder="Paste a user id"
+          {canSeeUsers && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium leading-none">Who</span>
+              <FilterSelect
+                label="Filter by user"
+                icon={UserRound}
+                allLabel="Everyone"
                 value={filters.actorId}
-                aria-describedby={describedBy}
-                aria-invalid={invalid || undefined}
-                onChange={(e) => change({ actorId: e.target.value.trim() })}
+                options={(staff.data ?? []).map((u) => ({
+                  value: u.id,
+                  label: u.fullName,
+                }))}
+                onChange={(actorId) => change({ actorId })}
               />
-            )}
-          </Field>
+            </div>
+          )}
         </div>
         {filtered && (
           <div className="flex flex-wrap items-center gap-2 border-b border-border-subtle px-4 py-2">
             {filters.actorId && (
               <FilterChip
-                label={`User ${filters.actorId.slice(0, 8)}…`}
+                label={`User: ${actor(filters.actorId)}`}
                 onRemove={() => change({ actorId: "" })}
               />
             )}

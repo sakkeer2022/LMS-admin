@@ -40,17 +40,17 @@ const card = (r: RoleSummary, mine = false) =>
 describe("permission copy", () => {
   it("speaks plainly for known permissions", () => {
     expect(wordsFor(perm("faculty.approve")).label).toBe(
-      "Approve tutor applications",
+      "Approve faculty applications",
     );
-    expect(areaFor("faculty").title).toBe("Tutors");
+    expect(areaFor("faculty").title).toBe("Faculty");
   });
   it("falls back to the registered description for a permission or area it has never heard of", () => {
     expect(
-      wordsFor(perm("payout.approve", "Approve a tutor payout")).label,
-    ).toBe("Approve a tutor payout");
+      wordsFor(perm("payout.approve", "Approve a faculty payout")).label,
+    ).toBe("Approve a faculty payout");
     expect(areaFor("payout").title).toBe("Payout");
   });
-  it("keeps a tutor's own-profile permissions out of admin roles", () => {
+  it("keeps a faculty member's own-profile permissions out of admin roles", () => {
     expect(forAdminRoles(perm("faculty.read_self"))).toBe(false);
     expect(forAdminRoles(perm("faculty.read"))).toBe(true);
   });

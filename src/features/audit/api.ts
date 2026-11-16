@@ -26,6 +26,19 @@ export function useAudit(
   });
 }
 
+/** Admins and staff (no students or faculty), for the "Who" filter. Needs user.read. */
+export function useStaffOptions(enabled: boolean) {
+  return useQuery({
+    queryKey: ["users", "staff-options"],
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: ({ signal }) =>
+      api<UserDetail[]>("/users?page=1&limit=100&audience=admin", { signal }).then(
+        (r) => r.data,
+      ),
+  });
+}
+
 /** Names for the actors on a page. Needs user.read; without it the caller shows a short id. */
 export function useActorNames(ids: string[], enabled: boolean) {
   const results = useQueries({

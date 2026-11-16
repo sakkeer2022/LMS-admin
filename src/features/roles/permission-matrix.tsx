@@ -108,7 +108,7 @@ export function PermissionMatrix({
     <div className="flex flex-col gap-4">
       <SearchInput
         label="Search what a role can do"
-        placeholder="Search, for example “approve tutors”"
+        placeholder="Search, for example “approve faculty”"
         className="w-full sm:w-96"
         value={search}
         onChange={setSearch}
@@ -123,13 +123,23 @@ export function PermissionMatrix({
         <EmptyState
           icon={SearchX}
           title="Nothing matches"
-          description="Try another word, like “tutor” or “price”."
+          description="Try another word, like “faculty” or “price”."
         />
       ) : (
         <ul className="grid gap-4 md:grid-cols-2">
           {areas.map(([resource, items], index) => {
             const { title, blurb, icon: Icon } = areaFor(resource);
-            const level = levelOf(items, selected);
+            const hasView = items.some(isView);
+            const hasChange = items.some((p) => !isView(p));
+            // An area with nothing to view has no View step; one with nothing to change is just None / View.
+            const levels = LEVELS.filter(
+              ({ id }) =>
+                id === "none" ||
+                (id === "view" && hasView) ||
+                (id === "manage" && hasChange),
+);
+            const raw = levelOf(items, selected);
+            const level = raw === "manage" && !hasChange ? "view" : raw;
             const on = items.filter((p) => selected.has(p.id)).length;
             const expanded = Boolean(needle) || open.has(resource);
             const panel = `area-${resource}`;
@@ -170,9 +180,12 @@ export function PermissionMatrix({
                 <div
                   role="radiogroup"
                   aria-label={`${title} access`}
-                  className="grid grid-cols-3 gap-1 rounded-md bg-sunken p-0.5"
+                  className={cn(
+                    "grid gap-1 rounded-md bg-sunken p-0.5",
+                    levels.length === 2 ? "grid-cols-2" : "grid-cols-3",
+                  )}
                 >
-                  {LEVELS.map(({ id, label }) => (
+                  {levels.map(({ id, label }) => (
                     <button
                       key={id}
                       type="button"
