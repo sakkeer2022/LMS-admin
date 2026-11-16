@@ -2,7 +2,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/shadcn/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/shadcn/sheet";
 import { SidebarAccount, SidebarBrand, SidebarNav } from "./sidebar-nav";
 import { Topbar } from "./topbar";
 
@@ -33,9 +38,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <SidebarAccount collapsed={collapsed} />
       </aside>
       <Sheet open={drawer} onOpenChange={setDrawer}>
-        <SheetContent side="left" className="w-60 gap-0 p-0 lg:hidden" aria-describedby={undefined}>
+        <SheetContent
+          side="left"
+          className="w-60 gap-0 p-0 lg:hidden"
+          aria-describedby={undefined}
+        >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <SheetDescription className="sr-only">Admin portal navigation</SheetDescription>
+          <SheetDescription className="sr-only">
+            Admin portal navigation
+          </SheetDescription>
           <SidebarBrand />
           <SidebarNav onNavigate={() => setDrawer(false)} />
           <SidebarAccount />
@@ -43,7 +54,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
       </Sheet>
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onToggleNavigation={toggleNavigation} />
-        <main id="main" className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+        <main
+          id="main"
+          className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
+        >
           {children}
         </main>
       </div>

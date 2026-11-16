@@ -50,7 +50,8 @@ export function PricingBadge({ status }: { status: PricingStatus }) {
 }
 
 export interface RowAction {
-  id: FacultyRowAction;
+  /** A key for the menu item; faculty rows use a FacultyRowAction, other lists any string */
+  id: string;
   label: string;
   onSelect: () => void;
   destructive?: boolean;

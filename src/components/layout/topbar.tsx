@@ -15,6 +15,8 @@ import {
 } from "@/components/shadcn/dropdown-menu";
 import { Input } from "@/components/shadcn/input";
 import { adminNavigation } from "./admin/navigation";
+import { useMyRoles } from "@/components/security/permission-provider";
+import { roleLabel } from "@/features/roles/types";
 import { initialsOf } from "./initials";
 
 const base = "/admin";
@@ -23,7 +25,9 @@ const pages = adminNavigation.flatMap((group) => group.items);
 function NavigationSearch() {
   const [query, setQuery] = useState("");
   const matches = query
-    ? pages.filter(([label]) => label.toLowerCase().includes(query.toLowerCase()))
+    ? pages.filter(([label]) =>
+        label.toLowerCase().includes(query.toLowerCase()),
+      )
     : [];
   return (
     <div className="relative hidden w-full max-w-[437px] sm:block">
@@ -63,9 +67,14 @@ function NavigationSearch() {
   );
 }
 
-export function Topbar({ onToggleNavigation }: { onToggleNavigation: () => void }) {
+export function Topbar({
+  onToggleNavigation,
+}: {
+  onToggleNavigation: () => void;
+}) {
   const me = useMe().data?.data;
   const logout = useLogout();
+  const roles = useMyRoles();
   return (
     <header className="flex h-16 shrink-0 items-center gap-3 bg-card px-4 sm:px-6">
       <Button
@@ -95,7 +104,8 @@ export function Topbar({ onToggleNavigation }: { onToggleNavigation: () => void 
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              aria-label="User menu"
+              aria-label={`User menu, ${roles.map(roleLabel).join(", ") || "no role"}`}
+              title={roles.map(roleLabel).join(", ")}
               className="rounded-pill outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
               <Avatar className="size-8">
@@ -105,7 +115,16 @@ export function Topbar({ onToggleNavigation }: { onToggleNavigation: () => void 
               </Avatar>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-56">
+            <div className="flex flex-col gap-0.5 px-2 py-1.5">
+              <span className="truncate text-sm font-semibold">
+                {me?.fullName ?? "My account"}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {roles.length > 0 ? roles.map(roleLabel).join(", ") : "No role yet"}
+              </span>
+            </div>
+            <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/admin/profile">My profile</Link>
             </DropdownMenuItem>
