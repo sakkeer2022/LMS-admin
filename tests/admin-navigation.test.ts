@@ -12,11 +12,12 @@ describe("admin navigation", () => {
       "Catalogue",
       "Operations",
       "Finance",
+      "Access",
       "Account",
     ]);
     const items = adminNavigation.flatMap((group) => group.items);
-    expect(items).toHaveLength(13);
-    expect(new Set(items.map((item) => item[1])).size).toBe(13);
+    expect(items).toHaveLength(15);
+    expect(new Set(items.map((item) => item[1])).size).toBe(15);
     // Students and Legal documents have no Figma frame yet (amentorz-backend docs/PENDING_DECISIONS.md, P12)
     expect(items.map(([title]) => title)).toEqual(
       expect.arrayContaining(["Students", "Legal documents"]),

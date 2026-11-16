@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { FormError } from "@/components/forms/field";
 import { Form } from "@/components/forms/form";
@@ -320,9 +321,20 @@ function SecurityCard({
   lastLoginAt?: string | null;
   format: Intl.DateTimeFormat;
 }) {
-  const [changing, setChanging] = useState(false);
+  // Sent here by an admin-set password: the dialog opens by itself and the rest of the portal is closed
+  const forced = useSearchParams().get("change-password") === "1";
+  const [changing, setChanging] = useState(forced);
   return (
     <SettingCard title="Sign-in and security" caption="Protect your account">
+      {forced && (
+        <p
+          role="note"
+          className="rounded-md border border-info-foreground/20 bg-info-subtle px-4 py-3 text-sm text-info-foreground"
+        >
+          You are using a password an administrator set. Choose your own to
+          continue; you will be asked to sign in again.
+        </p>
+      )}
       <SettingRow
         label="Last sign-in"
         description="The most recent successful sign-in to your account."

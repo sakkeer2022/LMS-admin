@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import {
   AuthCheckbox,
   AuthError,
@@ -19,7 +20,9 @@ import { ApiError } from "@/lib/api/contracts";
 // refresh with the already-rotated cookie would be treated as token theft and end the session
 let silentRefresh: Promise<unknown> | undefined;
 
-export function AuthForm() {
+/** `restoring`: the page was opened with a destination, so a session renewal is tried before the form is shown. */
+export function AuthForm({ restoring: tryingToRestore = false }: { restoring?: boolean }) {
+  const [restoring, setRestoring] = useState(tryingToRestore);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -41,7 +44,7 @@ export function AuthForm() {
       .then(() => {
         if (!cancelled) window.location.assign(safeRedirect(target));
       })
-      .catch(() => undefined);
+      .catch(() => setRestoring(false));
     return () => {
       cancelled = true;
     };
@@ -102,6 +105,17 @@ export function AuthForm() {
       setPending(false);
     }
   }
+
+  if (restoring)
+    return (
+      <div
+        role="status"
+        className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground"
+      >
+        <Loader2 aria-hidden className="size-6 animate-spin motion-reduce:animate-none" />
+        Restoring your session…
+      </div>
+    );
 
   return (
     <AuthFormShell

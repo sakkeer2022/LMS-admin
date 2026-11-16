@@ -1,4 +1,5 @@
 "use client";
+import { RecordActivity } from "@/features/audit/record-activity";
 import { useEffect, useState, type ReactNode } from "react";
 import { CheckCircle2, Download, Eye, FilePenLine, FileSignature, FileText } from "lucide-react";
 import { toast } from "sonner";
@@ -267,6 +268,8 @@ export function ReviewView({ detail, onClose }: { detail: FacultyDetail; onClose
           <p className="text-sm whitespace-pre-wrap">{detail.rejectionReason}</p>
         </Section>
       )}
+
+      <RecordActivity entity="faculty_profile" resourceId={detail.id} />
 
       {decidable && (
         <div className="flex items-center justify-between gap-3 p-4">

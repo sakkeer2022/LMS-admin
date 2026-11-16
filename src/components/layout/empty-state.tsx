@@ -23,7 +23,10 @@ export function EmptyState({
       )}
     >
       {Icon && (
-        <span aria-hidden className="mb-1 grid size-12 place-items-center rounded-full bg-accent text-primary">
+        <span
+          aria-hidden
+          className="mb-1 grid size-12 place-items-center rounded-full bg-accent text-primary"
+        >
           <Icon className="size-6" />
         </span>
       )}

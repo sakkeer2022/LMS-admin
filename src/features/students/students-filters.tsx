@@ -36,7 +36,7 @@ const AGE_LABELS: Record<Exclude<AgeGroup, "">, string> = {
 // Radix Select cannot hold an empty value, so "no filter" is this word and is mapped back to "" on change
 const ALL = "all";
 
-function FilterSelect({
+export function FilterSelect({
   label,
   icon: Icon,
   allLabel,
