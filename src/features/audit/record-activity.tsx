@@ -11,7 +11,7 @@ const words = (action: string) => {
 };
 
 /**
- * The latest decisions about one record (for example a tutor approved or rejected), newest first.
+ * The latest decisions about one record (for example a faculty member approved or rejected), newest first.
  * Only named actions are listed, never page views or raw requests. Hidden without `audit.read`.
  */
 export function RecordActivity({

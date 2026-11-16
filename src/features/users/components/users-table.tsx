@@ -113,7 +113,7 @@ export function UsersTable() {
       <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle>Platform users</CardTitle>
-          <CardDescription>Admins and staff. Students and tutors are in their own sections.</CardDescription>
+          <CardDescription>Admins and staff. Students and faculty are in their own sections.</CardDescription>
           <CardAction className="flex items-center gap-2">
             <SearchInput
               label="Search users"

@@ -11,7 +11,7 @@ const TINTS = [
 const tintOf = (name: string): number =>
   [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % TINTS.length;
 
-/** Initials in a tinted circle, for a student, tutor or any named person. */
+/** Initials in a tinted circle, for a student, faculty member or any named person. */
 export function PersonAvatar({
   name,
   size = "default",
