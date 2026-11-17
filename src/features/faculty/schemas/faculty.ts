@@ -9,6 +9,7 @@ import {
   type FacultySort,
   type FacultyTab,
   type PricingStatus,
+  type VerificationStatus,
 } from "../types/faculty";
 
 // ── Email rule (same expression as the backend, faculty.dto.ts) ──────
@@ -107,6 +108,14 @@ export const STATUS_META: Record<FacultyRowStatus, { label: string; variant: Bad
   suspended: { label: "Suspended", variant: "destructive" },
 };
 
+/** Verification column of the roster and the drawer header. */
+export const VERIFICATION_META: Record<VerificationStatus, { label: string; variant: BadgeVariant }> = {
+  new: { label: "New", variant: "info" },
+  approved: { label: "Approved", variant: "success" },
+  rejected: { label: "Rejected", variant: "destructive" },
+  reupload_requested: { label: "Requested for re-upload", variant: "warning" },
+};
+
 /** Pricing after approval (LMS-58/59): shown beside the status; "none" shows nothing. */
 export const PRICING_META: Record<Exclude<PricingStatus, "none">, { label: string; variant: BadgeVariant }> = {
   awaiting_price: { label: "Price pending", variant: "warning" },
@@ -133,6 +142,32 @@ export function canDecide(detail: Pick<FacultyDetail, "approvalStatus">) {
 
 export const REJECT_REASON_MAX = 1000;
 
+/** The reason dialog for each decision that needs one ("Reject" or "Request re-upload"). */
+export const REASON_DIALOG = {
+  reject: {
+    title: (name: string) => `Reject ${name}?`,
+    description: "This is final. The tutor is emailed this reason and cannot sign in.",
+    confirm: "Reject application",
+    placeholder: "Why the application cannot be approved",
+    missing: "Give the tutor a reason; it is included in the email.",
+  },
+  request_reupload: {
+    title: (name: string) => `Request a re-upload from ${name}?`,
+    description:
+      "The application goes back to the tutor. They are emailed this reason with a link to their filled-in application to correct and re-submit; the email says when the link expires.",
+    confirm: "Send request",
+    placeholder: "What to correct or re-upload, e.g. the PAN card scan is blurred",
+    missing: "Tell the tutor what to correct or re-upload; it is included in the email.",
+  },
+} as const;
+
+/** "14 Nov 2026, 4:00 pm" in the viewer's time zone, for the link expiry. */
+export function formatDateTime(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return `${formatShortDate(iso, new Date(0))}, ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+}
+
 export const TAB_LABELS: Record<FacultyTab, string> = {
   all: "All profiles",
   pending: "Pending",
@@ -147,7 +182,9 @@ export const SORT_LABELS: Record<FacultySort, string> = {
   name: "Name (A–Z)",
 };
 
-export const PAGE_SIZE = 7;
+/** The default rows per page, the same as every listing; 10, 20 and 50 can be chosen */
+export const PAGE_SIZE = 20;
+const PAGE_SIZE_CHOICES = [10, 20, 50];
 
 // ── URL state ───────────────────────────────────────────────────────
 
@@ -163,12 +200,14 @@ export function filtersFromParams(params: URLSearchParams): FacultyFilters {
   const category = params.get("category") ?? "";
   const search = params.get("search")?.trim() ?? "";
   const page = Number(params.get("page"));
+  const limit = Number(params.get("limit"));
   return {
     tab: (FACULTY_TABS as readonly string[]).includes(tab) ? (tab as FacultyTab) : "all",
     sort: (FACULTY_SORTS as readonly string[]).includes(sort) ? (sort as FacultySort) : "recent",
     ...(uuid.safeParse(category).success && { categoryId: category }),
     ...(search && { search: search.slice(0, 100) }),
     page: Number.isInteger(page) && page > 0 ? page : 1,
+    limit: PAGE_SIZE_CHOICES.includes(limit) ? limit : PAGE_SIZE,
   };
 }
 
@@ -180,7 +219,7 @@ export function listQuery(filters: FacultyFilters) {
     categoryId: filters.categoryId,
     search: filters.search,
     page: String(filters.page),
-    limit: String(PAGE_SIZE),
+    limit: String(filters.limit),
   };
 }
 
@@ -203,8 +242,11 @@ export function subjectsLabel(row: FacultyListItem) {
   return row.subjects.length ? row.subjects.join(" · ") : "—";
 }
 
+/** "3 of 3", or "3 of 3 · +2 additional" when the tutor added optional documents. */
 export function documentsLabel(row: FacultyListItem) {
-  return row.documents ? `${row.documents.uploaded} of ${row.documents.required}` : "—";
+  if (!row.documents) return "—";
+  const base = `${row.documents.uploaded} of ${row.documents.required}`;
+  return row.documents.additional ? `${base} · +${row.documents.additional} additional` : base;
 }
 
 /** Second line of the tutor cell. */

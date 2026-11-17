@@ -1,55 +1,27 @@
 "use client";
-import type { ColumnDef } from "@tanstack/react-table";
-import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@/components/shadcn/badge";
+import { Baby, SearchX, ShieldAlert, Users, type LucideIcon } from "lucide-react";
+import { Card } from "@/components/shadcn/card";
 import { Button } from "@/components/shadcn/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/shadcn/card";
-import { Input } from "@/components/shadcn/input";
-import { DataTable } from "@/components/data-table/data-table";
-import { TablePagination } from "@/components/data-table/table-pagination";
+import { Skeleton } from "@/components/shadcn/skeleton";
+import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { PanelMessage } from "@/components/layout/panel-message";
 import { usePermission } from "@/components/security/permission-provider";
-import { SettingSelect } from "@/components/settings/setting-layout";
 import { useCountries } from "@/features/legal/api";
+import { cn } from "@/lib/utils";
 import { useStudents } from "./api";
-import { StudentSheet } from "./student-sheet";
 import {
-  CONSENT_LABELS,
-  RELATIONSHIP_LABELS,
-  type AdminStudent,
-  type ConsentStatus,
-  type StudentFilters,
-} from "./types";
+  NO_FILTERS,
+  StudentsFilters,
+  type FilterState,
+} from "./students-filters";
+import { TablePagination } from "@/components/data-table/table-pagination";
+import { StudentsList } from "./students-table";
+import { StudentSheet } from "./student-sheet";
+import type { StudentFilters } from "./types";
 
-const LIMIT = 20;
-
-export const formatDate = (iso: string): string =>
-  new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
-    new Date(iso),
-  );
-
-export function ConsentBadge({ status }: { status: ConsentStatus }) {
-  return (
-    <Badge
-      variant={
-        status === "signed"
-          ? "success"
-          : status === "missing"
-            ? "warning"
-            : "secondary"
-      }
-    >
-      {CONSENT_LABELS[status]}
-    </Badge>
-  );
-}
+const NO_COUNTRIES: { code: string; name: string }[] = [];
 
 function useDebounced<T>(value: T, delay = 300): T {
   const [debounced, setDebounced] = useState(value);
@@ -60,119 +32,136 @@ function useDebounced<T>(value: T, delay = 300): T {
   return debounced;
 }
 
+/** One count that is also a shortcut to the list it counts. */
+function Stat({
+  label,
+  icon: Icon,
+  value,
+  hint,
+  progress,
+  tone = "default",
+  pressed,
+  onClick,
+}: {
+  label: string;
+  icon: LucideIcon;
+  value: number | undefined;
+  hint: string;
+  /** A share of the whole, drawn as a thin bar under the hint */
+  progress?: { done: number; total: number };
+  tone?: "default" | "warning";
+  pressed: boolean;
+  onClick: () => void;
+}) {
+  const warn = tone === "warning" && (value ?? 0) > 0;
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-4 rounded-md border bg-card p-4 text-left shadow-card outline-none transition-all hover:-translate-y-px hover:border-border-strong focus-visible:ring-[3px] focus-visible:ring-ring/50 motion-reduce:transition-none",
+        pressed && "border-primary bg-accent/40",
+        warn && !pressed && "border-warning-border/50",
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "grid size-11 shrink-0 place-items-center rounded-md",
+          warn
+            ? "bg-warning-subtle text-warning-foreground"
+            : "bg-accent text-primary",
+        )}
+      >
+        <Icon className="size-5" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-xs font-semibold text-text-secondary">
+          {label}
+        </span>
+        {value === undefined ? (
+          <Skeleton className="my-1 h-7 w-12" />
+        ) : (
+          <span className="text-2xl leading-8 font-bold tracking-tight">
+            {value.toLocaleString()}
+          </span>
+        )}
+        <span className="text-xs text-text-secondary">{hint}</span>
+        {progress && progress.total > 0 && (
+          <span
+            role="progressbar"
+            aria-label={hint}
+            aria-valuemin={0}
+            aria-valuemax={progress.total}
+            aria-valuenow={progress.done}
+            className="mt-1.5 h-1.5 w-full overflow-hidden rounded-pill bg-sunken"
+          >
+            <span
+              className="block h-full rounded-pill bg-primary transition-[width] duration-500 motion-reduce:transition-none"
+              style={{ width: `${(progress.done / progress.total) * 100}%` }}
+            />
+          </span>
+        )}
+      </span>
+    </button>
+  );
+}
+
 export function StudentsPage() {
   const allowed = usePermission("student.read");
   const countries = useCountries();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [country, setCountry] = useState("");
-  const [age, setAge] = useState<"" | "true" | "false">("");
-  const [consent, setConsent] = useState<"" | ConsentStatus>("");
+  const [limit, setLimit] = useState(20);
+  const [filters, setFilters] = useState<FilterState>(NO_FILTERS);
   const [selected, setSelected] = useState<string | null>(null);
-  const q = useDebounced(search.trim());
+  const q = useDebounced(filters.search.trim());
 
-  const filters: StudentFilters = {
+  const params: StudentFilters = {
     page,
-    limit: LIMIT,
+    limit,
     ...(q && { q }),
-    ...(country && { country }),
-    ...(age && { minor: age }),
-    ...(consent && { consent }),
+    ...(filters.country && { country: filters.country }),
+    ...(filters.age && { minor: filters.age }),
+    ...(filters.consent && { consent: filters.consent }),
   };
-  const query = useStudents(filters, allowed);
-  // How many minors have no signed consent at all, whatever the filters: the number that needs attention
-  const attention = useStudents(
+  const query = useStudents(params, allowed);
+  // Whole-roster counts, whatever the filters, so they stay put while the list is narrowed
+  const everyone = useStudents({ page: 1, limit: 1 }, allowed);
+  const minors = useStudents({ page: 1, limit: 1, minor: "true" }, allowed);
+  const missing = useStudents(
     { page: 1, limit: 1, consent: "missing" },
     allowed,
   );
-  const missing = attention.data?.meta?.total ?? 0;
 
-  const columns = useMemo<ColumnDef<AdminStudent>[]>(
-    () => [
-      {
-        accessorKey: "fullName",
-        header: "Student",
-        cell: ({ row }) => (
-          <div className="flex min-w-0 flex-col">
-            <button
-              type="button"
-              className="w-fit text-left font-semibold underline-offset-2 hover:underline focus-visible:underline"
-              onClick={() => setSelected(row.original.id)}
-            >
-              {row.original.fullName}
-            </button>
-            <span className="truncate text-xs text-text-secondary">
-              {row.original.email}
-            </span>
-          </div>
-        ),
-      },
-      {
-        accessorKey: "age",
-        header: "Age",
-        cell: ({ row }) => (
-          <span className="flex items-center gap-2">
-            {row.original.age}
-            {row.original.isMinor && <Badge variant="info">Minor</Badge>}
-          </span>
-        ),
-      },
-      { accessorKey: "country", header: "Country" },
-      {
-        id: "guardian",
-        header: "Guardian",
-        cell: ({ row }) =>
-          row.original.guardian ? (
-            <span className="flex flex-col">
-              <span>{row.original.guardian.fullName}</span>
-              <span className="text-xs text-text-secondary">
-                {RELATIONSHIP_LABELS[row.original.guardian.relationship] ??
-                  row.original.guardian.relationship}
-              </span>
-            </span>
-          ) : (
-            <span className="text-text-secondary">—</span>
-          ),
-      },
-      {
-        accessorKey: "consentStatus",
-        header: "Guardian consent",
-        cell: ({ getValue }) => (
-          <ConsentBadge status={getValue<ConsentStatus>()} />
-        ),
-      },
-      {
-        accessorKey: "registeredAt",
-        header: "Registered",
-        cell: ({ getValue }) => formatDate(getValue<string>()),
-      },
-      {
-        id: "actions",
-        header: () => <span className="sr-only">Actions</span>,
-        cell: ({ row }) => (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelected(row.original.id)}
-          >
-            View
-          </Button>
-        ),
-        meta: { align: "right" },
-      },
-    ],
-    [],
-  );
+  const countryList = countries.data ?? NO_COUNTRIES;
+  const countryName = useMemo(() => {
+    const names = new Map(countryList.map((item) => [item.code, item.name]));
+    return (code: string) => names.get(code) ?? code;
+  }, [countryList]);
 
   if (!allowed)
     return <PanelMessage>Requires student.read permission.</PanelMessage>;
 
-  function reset<T>(set: (value: T) => void) {
-    return (value: T) => {
-      set(value);
-      setPage(1);
-    };
+  // Any change to the search or filters starts again from the first page
+  function change(next: FilterState) {
+    setFilters(next);
+    setPage(1);
   }
+  const only = (patch: Partial<FilterState>): FilterState => ({
+    ...NO_FILTERS,
+    ...patch,
+  });
+  const is = (state: FilterState) =>
+    filters.search === state.search &&
+    filters.country === state.country &&
+    filters.age === state.age &&
+    filters.consent === state.consent;
+  const filtered = !is(NO_FILTERS);
+  const total = query.data?.meta?.total ?? query.data?.data.length ?? 0;
+  const minorTotal = minors.data?.meta?.total;
+  const missingTotal = missing.data?.meta?.total;
+  const listed = query.data?.data ?? [];
 
   return (
     <>
@@ -181,120 +170,103 @@ export function StudentsPage() {
         description="Registered students, their guardian contact and whether a guardian has signed the Student Terms."
       />
 
-      {missing > 0 && (
-        <div
-          role="status"
-          className="flex flex-wrap items-center gap-3 rounded-md border border-warning-border bg-warning-subtle px-4 py-3 text-sm text-warning-foreground"
-        >
-          <AlertTriangle aria-hidden className="size-5 shrink-0" />
-          <p className="min-w-0 flex-1">
-            <span className="font-semibold">
-              {missing} {missing === 1 ? "minor has" : "minors have"} no signed
-              guardian consent.
-            </span>
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setConsent("missing");
-              setAge("");
-              setCountry("");
-              setSearch("");
-              setPage(1);
-            }}
-          >
-            Show them
-          </Button>
-        </div>
-      )}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Stat
+          label="All students"
+          icon={Users}
+          value={everyone.data?.meta?.total}
+          hint="Registered accounts"
+          pressed={is(NO_FILTERS)}
+          onClick={() => change(NO_FILTERS)}
+        />
+        <Stat
+          label="Minors"
+          icon={Baby}
+          value={minors.data?.meta?.total}
+          hint={
+            minorTotal !== undefined && missingTotal !== undefined
+              ? `${minorTotal - missingTotal} of ${minorTotal} have signed consent`
+              : "Under the guardian-consent age"
+          }
+          progress={
+            minorTotal !== undefined && missingTotal !== undefined
+              ? { done: minorTotal - missingTotal, total: minorTotal }
+              : undefined
+          }
+          pressed={is(only({ age: "true" }))}
+          onClick={() => change(only({ age: "true" }))}
+        />
+        <Stat
+          label="Consent missing"
+          icon={ShieldAlert}
+          value={missing.data?.meta?.total}
+          hint="Minors with no signed consent"
+          tone="warning"
+          pressed={is(only({ consent: "missing" }))}
+          onClick={() => change(only({ consent: "missing" }))}
+        />
+      </div>
 
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle>All students</CardTitle>
-          <CardDescription>
-            Search by name, email or mobile number, or narrow the list.
-          </CardDescription>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Input
-              type="search"
-              aria-label="Search students"
-              placeholder="Search students"
-              className="w-56"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-            />
-            <SettingSelect
-              aria-label="Country"
-              className="h-9 w-auto text-sm font-normal"
-              value={country}
-              onChange={(event) => reset(setCountry)(event.target.value)}
-            >
-              <option value="">All countries</option>
-              {(countries.data ?? []).map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.name}
-                </option>
-              ))}
-            </SettingSelect>
-            <SettingSelect
-              aria-label="Age group"
-              className="h-9 w-auto text-sm font-normal"
-              value={age}
-              onChange={(event) =>
-                reset(setAge)(event.target.value as "" | "true" | "false")
-              }
-            >
-              <option value="">All ages</option>
-              <option value="true">Minors</option>
-              <option value="false">Adults</option>
-            </SettingSelect>
-            <SettingSelect
-              aria-label="Guardian consent"
-              className="h-9 w-auto text-sm font-normal"
-              value={consent}
-              onChange={(event) =>
-                reset(setConsent)(event.target.value as "" | ConsentStatus)
-              }
-            >
-              <option value="">Any consent status</option>
-              <option value="signed">Signed</option>
-              <option value="missing">Missing</option>
-              <option value="not_required">Not required</option>
-            </SettingSelect>
-          </div>
-        </CardHeader>
+      <Card className="gap-0 overflow-hidden">
+        <StudentsFilters
+          value={filters}
+          countries={countryList}
+          onChange={change}
+        />
         {query.isError ? (
           <PanelMessage onRetry={() => void query.refetch()}>
             Students could not be loaded.
           </PanelMessage>
-        ) : (
-          <>
-            <DataTable
-              caption={`Students, page ${page}`}
-              columns={columns}
-              data={query.data?.data ?? []}
-              getRowId={(student) => student.id}
-              loading={query.isPending}
-              empty="No students match."
+        ) : !query.isPending && query.data?.data.length === 0 ? (
+          <div className="p-6">
+            <EmptyState
+              icon={filtered ? SearchX : Users}
+              title={filtered ? "No students match" : "No students yet"}
+              description={
+                filtered
+                  ? "Try a different search, or clear the filters to see everyone."
+                  : "Students appear here once they register."
+              }
+              action={
+                filtered ? (
+                  <Button variant="outline" onClick={() => change(NO_FILTERS)}>
+                    Clear filters
+                  </Button>
+                ) : undefined
+              }
             />
-            {query.data && (
-              <TablePagination
-                page={page}
-                limit={LIMIT}
-                total={query.data.meta?.total ?? query.data.data.length}
-                noun="students"
-                onPage={setPage}
-              />
-            )}
-          </>
+          </div>
+        ) : (
+          <StudentsList
+            students={query.data?.data ?? []}
+            loading={query.isPending}
+            caption={`Students, page ${page}`}
+            countryName={countryName}
+            selectedId={selected}
+            onSelect={setSelected}
+          />
+        )}
+        {query.data && !query.isError && (
+          <TablePagination
+            noun="students"
+            page={page}
+            limit={limit}
+            total={total}
+            onPage={setPage}
+            onLimit={(next) => {
+              setLimit(next);
+              setPage(1);
+            }}
+          />
         )}
       </Card>
 
-      <StudentSheet studentId={selected} onClose={() => setSelected(null)} />
+      <StudentSheet
+        studentId={selected}
+        neighbours={listed}
+        onSelect={setSelected}
+        onClose={() => setSelected(null)}
+      />
     </>
   );
 }

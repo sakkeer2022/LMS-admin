@@ -1,7 +1,10 @@
 "use client";
+import { RecordActivity } from "@/features/audit/record-activity";
 import { useEffect, useState, type ReactNode } from "react";
-import { CheckCircle2, Download, Eye, FileText } from "lucide-react";
+import { CheckCircle2, Download, Eye, FilePenLine, FileSignature, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { CopyValue } from "@/components/feedback/copy-button";
+import { PersonAvatar } from "@/components/feedback/person-avatar";
 import { ConfirmDialog } from "@/components/forms/confirm-dialog";
 import { FormError, TextareaField } from "@/components/forms/field";
 import { PanelMessage } from "@/components/layout/panel-message";
@@ -22,15 +25,15 @@ import { Switch } from "@/components/shadcn/switch";
 import { Label } from "@/components/shadcn/label";
 import { describeApiError } from "@/lib/api/errors";
 import { formatPaise } from "@/lib/currency/money";
-import { fetchDocumentBlob, useFacultyDetail, useReviewFaculty, useSetDocumentVerified } from "../api/faculty";
-import { REJECT_REASON_MAX, canDecide, formatFileSize, formatShortDate } from "../schemas/faculty";
+import { fetchDocumentBlob, fetchSignatureBlob, useFacultyDetail, useReviewFaculty, useSetDocumentVerified } from "../api/faculty";
+import { REASON_DIALOG, REJECT_REASON_MAX, canDecide, formatDateTime, formatFileSize, formatShortDate } from "../schemas/faculty";
 import type { FacultyDetail, FacultyDocument } from "../types/faculty";
-import { FacultyStatusBadge, PricingBadge } from "./faculty-table";
+import { FacultyStatusBadge, PricingBadge, VerificationBadge } from "./faculty-table";
 
 /**
- * Screen 27b: the tutor's onboarding application. Screening answers, the three documents
- * (preview, download, mark as verified), the subject cards with their price state, the
- * publish toggle, and Reject / Verify & publish.
+ * Screen 27b: the tutor's onboarding application. Screening answers, the three required documents and
+ * any additional ones (preview, download, mark as verified), the subject cards with their price state,
+ * the signed price agreement, the publish toggle, and Reject / Request re-upload / Verify & publish.
  */
 export function FacultyReviewDrawer({ facultyId, onClose }: { facultyId: string | undefined; onClose: () => void }) {
   const detail = useFacultyDetail(facultyId);
@@ -92,54 +95,79 @@ export function ReviewView({ detail, onClose }: { detail: FacultyDetail; onClose
   const canViewDocuments = usePermission("faculty.documents");
   const review = useReviewFaculty(detail.id);
   const [publish, setPublish] = useState(true);
-  const [rejecting, setRejecting] = useState(false);
+  // The decision whose reason dialog is open: a final rejection or a request to correct and re-upload
+  const [asking, setAsking] = useState<"reject" | "request_reupload">();
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState<string>();
   const [error, setError] = useState<string>();
   const decidable = canApprove && canDecide(detail);
   const verified = detail.documents.filter((d) => d.isVerified).length;
+  const required = detail.documents.filter((d) => d.required);
+  const additional = detail.documents.filter((d) => !d.required);
 
-  const decide = async (decision: "approve" | "reject") => {
+  const ask = (decision: "reject" | "request_reupload") => {
+    setReason("");
+    setReasonError(undefined);
+    setAsking(decision);
+  };
+
+  const decide = async (decision: "approve" | "reject" | "request_reupload") => {
     setError(undefined);
-    if (decision === "reject") {
+    if (decision !== "approve") {
       const trimmed = reason.trim();
-      if (!trimmed) return setReasonError("Give the tutor a reason; it is included in the email.");
+      if (!trimmed) return setReasonError(REASON_DIALOG[decision].missing);
       if (trimmed.length > REJECT_REASON_MAX) return setReasonError(`Keep the reason under ${REJECT_REASON_MAX} characters.`);
     }
     try {
-      await review.mutateAsync({
+      const updated = await review.mutateAsync({
         decision,
         publish: decision === "approve" ? publish : false,
         expectedRevision: detail.revision,
-        ...(decision === "reject" ? { reason: reason.trim() } : {}),
+        ...(decision !== "approve" ? { reason: reason.trim() } : {}),
       });
-      setRejecting(false);
-      toast.success(
-        decision === "approve"
-          ? `${detail.fullName} is verified${publish ? " and will be published" : ""}`
-          : `${detail.fullName}'s application was rejected`,
-        {
-          description:
-            decision === "approve"
-              ? "Set a price for each subject card in Pricing; the tutor can sign in once every card is priced."
-              : "The tutor has been emailed the reason.",
-        },
-      );
+      setAsking(undefined);
+      const messages = {
+        approve: [
+          `${detail.fullName} is verified${publish ? " and will be published" : ""}`,
+          "Set a price for each subject card in Pricing; the tutor can sign in once every card is priced.",
+        ],
+        reject: [`${detail.fullName}'s application was rejected`, "The tutor has been emailed the reason."],
+        request_reupload: [
+          `Re-upload requested from ${detail.fullName}`,
+          `The tutor has been emailed the reason and a link that expires ${updated.reupload ? formatDateTime(updated.reupload.expiresAt) : "soon"}.`,
+        ],
+      } as const;
+      toast.success(messages[decision][0], { description: messages[decision][1] });
     } catch (err) {
       const described = describeApiError(err, "review tutors");
-      if (decision === "reject" && described.fields.reason) setReasonError(described.fields.reason);
+      if (decision !== "approve" && described.fields.reason) setReasonError(described.fields.reason);
       setError(described.message);
     }
   };
 
   return (
     <>
-      <SheetHeader className="border-b">
-        <SheetTitle className="text-lg">{detail.fullName}</SheetTitle>
-        <SheetDescription>
-          {[detail.applicationReference, detail.email].filter(Boolean).join(" · ")}
-        </SheetDescription>
-        <div className="flex flex-wrap items-center gap-1 pt-1">
+      <SheetHeader className="gap-3 border-b bg-accent/40 pr-12">
+        <div className="flex items-center gap-3">
+          <PersonAvatar name={detail.fullName} size="lg" />
+          <div className="flex min-w-0 flex-col">
+            <SheetTitle className="truncate text-lg">{detail.fullName}</SheetTitle>
+            <SheetDescription asChild>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5">
+                <CopyValue value={detail.email} label="Email">
+                  <span className="truncate">{detail.email}</span>
+                </CopyValue>
+                {detail.applicationReference && (
+                  <CopyValue value={detail.applicationReference} label="Application reference">
+                    <span className="font-mono text-xs">{detail.applicationReference}</span>
+                  </CopyValue>
+                )}
+              </div>
+            </SheetDescription>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          <VerificationBadge status={detail.verification} />
           <FacultyStatusBadge status={detail.status} />
           <PricingBadge status={detail.pricing} />
         </div>
@@ -150,22 +178,56 @@ export function ReviewView({ detail, onClose }: { detail: FacultyDetail; onClose
           <Fact label="Highest qualification" value={detail.screening.highestQualification} />
           <Fact label="Studied at" value={detail.screening.studiedAt} />
           <Fact label="Teaching experience" value={detail.screening.teachingExperience?.label} />
-          <Fact label="Offline classes" value={detail.screening.offersOfflineClasses ? "Yes" : "No"} />
+          <Fact
+            label="Mode of teaching"
+            value={detail.screening.teachingMode?.label ?? (detail.screening.offersOfflineClasses ? "Offers offline classes" : "Online")}
+          />
           <Fact label="City" value={detail.city} />
-          <Fact label="Mobile" value={detail.mobileNumber} />
+          <Fact label="Mobile" value={detail.mobileNumber ? <CopyValue value={detail.mobileNumber} label="Mobile number" /> : null} />
           <Fact label="Submitted" value={detail.submittedAt ? formatShortDate(detail.submittedAt) : formatShortDate(detail.appliedAt)} />
         </dl>
       </Section>
+
+      {detail.reupload && (
+        <Section title="Re-upload requested">
+          <div className="flex gap-3 rounded-md border border-warning-border bg-warning-subtle p-3 text-sm">
+            <FilePenLine aria-hidden="true" className="size-5 shrink-0 text-warning-foreground" />
+            <div className="flex min-w-0 flex-col gap-1">
+              <p className="break-words whitespace-pre-wrap">{detail.reupload.reason}</p>
+              <p className="text-xs text-muted-foreground">
+                Sent {formatDateTime(detail.reupload.requestedAt)} ·{" "}
+                {detail.reupload.expired ? (
+                  <span className="font-semibold text-error-foreground">link expired {formatDateTime(detail.reupload.expiresAt)}</span>
+                ) : (
+                  <>link expires {formatDateTime(detail.reupload.expiresAt)}</>
+                )}
+              </p>
+            </div>
+          </div>
+        </Section>
+      )}
 
       <Section title="Documents" action={<span className="text-xs text-muted-foreground">{verified} of {detail.documents.length} verified</span>}>
         {detail.documents.length === 0 ? (
           <p className="text-sm text-muted-foreground">No documents uploaded.</p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {detail.documents.map((doc) => (
-              <DocumentRow key={doc.id} facultyId={detail.id} doc={doc} canView={canViewDocuments} canVerify={canApprove && detail.approvalStatus !== "rejected"} />
-            ))}
-          </ul>
+          <>
+            <ul className="flex flex-col gap-2" aria-label="Required documents">
+              {required.map((doc) => (
+                <DocumentRow key={doc.id} facultyId={detail.id} doc={doc} canView={canViewDocuments} canVerify={canApprove && detail.approvalStatus !== "rejected"} />
+              ))}
+            </ul>
+            {additional.length > 0 && (
+              <>
+                <h4 className="pt-1 text-xs font-semibold text-muted-foreground">Additional documents ({additional.length})</h4>
+                <ul className="flex flex-col gap-2" aria-label="Additional documents">
+                  {additional.map((doc) => (
+                    <DocumentRow key={doc.id} facultyId={detail.id} doc={doc} canView={canViewDocuments} canVerify={canApprove && detail.approvalStatus !== "rejected"} />
+                  ))}
+                </ul>
+              </>
+            )}
+          </>
         )}
       </Section>
 
@@ -173,7 +235,14 @@ export function ReviewView({ detail, onClose }: { detail: FacultyDetail; onClose
         <ul className="grid gap-2 sm:grid-cols-2">
           {detail.subjects.map((s) => (
             <li key={s.assignmentId} className="flex flex-col gap-0.5 rounded-md border p-3">
-              <span className="text-sm font-semibold">{s.subject}</span>
+              <span className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                {s.subject}
+                {s.source === "profile" && s.status !== "approved" && (
+                  <Badge variant={s.status === "rejected" ? "destructive" : "info"}>
+                    {s.status === "rejected" ? "Rejected" : "Pending approval"}
+                  </Badge>
+                )}
+              </span>
               <span className="text-xs break-words text-muted-foreground">{s.pathLabel}</span>
               <span className="pt-1 text-xs">
                 {s.sessionPricePaise === null ? (
@@ -191,6 +260,7 @@ export function ReviewView({ detail, onClose }: { detail: FacultyDetail; onClose
         {detail.pricing === "declined" && (
           <p className="text-sm text-error-foreground">The tutor declined these prices. Update them in Pricing to ask again.</p>
         )}
+        {detail.consentSigned && <SignedAgreement facultyId={detail.id} decidedAt={detail.consentDecidedAt} canView={canViewDocuments} />}
       </Section>
 
       {detail.approvalStatus === "rejected" && detail.rejectionReason && (
@@ -198,6 +268,8 @@ export function ReviewView({ detail, onClose }: { detail: FacultyDetail; onClose
           <p className="text-sm whitespace-pre-wrap">{detail.rejectionReason}</p>
         </Section>
       )}
+
+      <RecordActivity entity="faculty_profile" resourceId={detail.id} />
 
       {decidable && (
         <div className="flex items-center justify-between gap-3 p-4">
@@ -212,15 +284,19 @@ export function ReviewView({ detail, onClose }: { detail: FacultyDetail; onClose
         <FormError message={error} />
       </div>
 
-      <SheetFooter className="flex-row justify-end border-t">
+      <SheetFooter className="flex-row flex-wrap justify-end border-t">
         {decidable ? (
           <>
-            <Button variant="outline" onClick={() => { setReason(""); setReasonError(undefined); setRejecting(true); }} disabled={review.isPending}>
+            <Button variant="outline" className="text-destructive" onClick={() => ask("reject")} disabled={review.isPending}>
               Reject
+            </Button>
+            <Button variant="outline" onClick={() => ask("request_reupload")} disabled={review.isPending}>
+              <FilePenLine aria-hidden="true" />
+              Request re-upload
             </Button>
             <Button onClick={() => void decide("approve")} disabled={review.isPending}>
               <CheckCircle2 aria-hidden="true" />
-              {review.isPending && !rejecting ? "Saving…" : "Verify & publish"}
+              {review.isPending && !asking ? "Saving…" : "Verify & publish"}
             </Button>
           </>
         ) : (
@@ -231,18 +307,19 @@ export function ReviewView({ detail, onClose }: { detail: FacultyDetail; onClose
       </SheetFooter>
 
       <ConfirmDialog
-        open={rejecting}
-        title={`Reject ${detail.fullName}?`}
-        description="The tutor is emailed this reason and cannot sign in."
-        confirmLabel="Reject application"
-        destructive
+        open={Boolean(asking)}
+        title={asking ? REASON_DIALOG[asking].title(detail.fullName) : ""}
+        description={asking ? REASON_DIALOG[asking].description : undefined}
+        confirmLabel={asking ? REASON_DIALOG[asking].confirm : "Confirm"}
+        destructive={asking === "reject"}
         pending={review.isPending}
-        onCancel={() => setRejecting(false)}
-        onConfirm={() => void decide("reject")}
+        onCancel={() => setAsking(undefined)}
+        onConfirm={() => asking && void decide(asking)}
       >
         <TextareaField
-          label="Reason"
+          label={asking === "request_reupload" ? "What should the tutor change?" : "Reason"}
           required
+          placeholder={asking ? REASON_DIALOG[asking].placeholder : undefined}
           maxLength={REJECT_REASON_MAX}
           value={reason}
           error={reasonError}
@@ -342,5 +419,50 @@ function DocumentRow({ facultyId, doc, canView, canVerify }: { facultyId: string
         </DialogContent>
       </Dialog>
     </li>
+  );
+}
+
+/** The signature the tutor drew when they accepted their prices (opened through the API, audited). */
+function SignedAgreement({ facultyId, decidedAt, canView }: { facultyId: string; decidedAt: string | null; canView: boolean }) {
+  const [url, setUrl] = useState<string>();
+  const [opening, setOpening] = useState(false);
+  useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
+  return (
+    <div className="flex items-center gap-3 rounded-md border p-3">
+      <FileSignature aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="text-sm font-semibold">Signed price agreement</span>
+        {decidedAt && <span className="text-xs text-muted-foreground">Signed {formatDateTime(decidedAt)}</span>}
+      </div>
+      {canView && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={opening}
+          onClick={async () => {
+            setOpening(true);
+            try {
+              setUrl(await fetchSignatureBlob(facultyId));
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "The signature could not be opened.");
+            } finally {
+              setOpening(false);
+            }
+          }}
+        >
+          View signature
+        </Button>
+      )}
+      <Dialog open={Boolean(url)} onOpenChange={(next) => !next && setUrl(undefined)}>
+        <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Signed price agreement</DialogTitle>
+            <DialogDescription>{decidedAt ? `Signed ${formatDateTime(decidedAt)}` : "The tutor's signature"}</DialogDescription>
+          </DialogHeader>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {url && <img src={url} alt="Tutor's signature" className="max-h-60 w-full rounded-md border bg-white object-contain" />}
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

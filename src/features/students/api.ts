@@ -39,6 +39,20 @@ export function useStudent(id: string | null) {
   });
 }
 
+/** Fetches a student's signed consent as a PDF blob URL for the viewer. Same password confirmation and audit entry as a download. The caller revokes the URL. */
+export function useViewConsent() {
+  const withReauth = useWithReauth();
+  return useCallback(
+    async (studentId: string): Promise<string> => {
+      const pdf = await withReauth(() =>
+        apiBlob(`/admin/students/${studentId}/guardian-consent/file`),
+      );
+      return URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
+    },
+    [withReauth],
+  );
+}
+
 /** Downloads a student's signed consent. It needs a fresh password confirmation, which the dialog asks for. */
 export function useDownloadConsent() {
   const withReauth = useWithReauth();

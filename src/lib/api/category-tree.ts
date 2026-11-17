@@ -6,8 +6,9 @@ import { applyRelocation, applyRename, applyReorder, relocation, type Placement 
 
 // Contract: amentorz-backend src/modules/category-tree (category-tree.routes.ts,
 // category-tree.dto.ts, category-tree.reads.ts), ADR-0005. The admin manages only the
-// tree: names, order, active state. A category without sub-categories is a leaf, the
-// thing tutors pick on onboarding (migration 20261105090000_category_simple_leaves).
+// tree: names, order, active state, and the subjects each leaf offers. A category without
+// sub-categories is a leaf; tutors pick one of its subjects on onboarding (migration
+// 20261110090000_leaf_subject_offerings).
 
 const node = z.object({
   id: z.string(),
@@ -53,8 +54,24 @@ const json = (method: 'POST' | 'PUT' | 'PATCH', body: unknown) => ({ method, bod
 const base = '/admin/category-tree';
 const at = (id: string) => `${base}/${encodeURIComponent(id)}`;
 
+/** One subject a leaf offers, with how much already depends on it. */
+export const leafSubjectSchema = z.object({
+  curriculumId: z.string(),
+  subjectId: z.string(),
+  name: z.string(),
+  /** The leaf offers it */
+  isActive: z.boolean(),
+  /** The subject itself is switched on for every leaf */
+  subjectActive: z.boolean(),
+  tutors: z.number(),
+  prices: z.number(),
+  learners: z.number(),
+});
+export type LeafSubject = z.infer<typeof leafSubjectSchema>;
+
 export const categoryTreeKeys = {
   all: () => ['category-tree'] as const,
+  subjects: (id: string) => ['category-tree', 'subjects', id] as const,
   tree: () => ['category-tree', 'tree'] as const,
   detail: (id: string) => ['category-tree', 'detail', id] as const,
   lookups: (kind: 'levels' | 'boards' | 'subjects') => ['category-tree', 'lookups', kind] as const,
@@ -80,6 +97,14 @@ export function useCategoryDetail(id: string | undefined) {
     queryKey: categoryTreeKeys.detail(id ?? ''),
     enabled: Boolean(id),
     queryFn: ({ signal }) => getData(categoryDetailSchema, at(id!), signal),
+  });
+}
+
+export function useLeafSubjects(id: string | undefined) {
+  return useQuery({
+    queryKey: categoryTreeKeys.subjects(id ?? ''),
+    enabled: Boolean(id),
+    queryFn: ({ signal }) => getData(z.array(leafSubjectSchema), `${at(id!)}/subjects`, signal),
   });
 }
 
@@ -154,4 +179,29 @@ export const useRelocateCategory = () =>
 export const useDeleteCategory = () =>
   useTreeMutation(async ({ id, version }: { id: string; version: number }) => {
     await api<null>(`${at(id)}?${queryString({ version: String(version) })}`, { method: 'DELETE' });
+  });
+
+/** Subject writes change what the picker and the pricing screen list, so those refetch too. */
+function useSubjectMutation<V>(fn: (input: V) => Promise<unknown>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    meta: { inlineErrors: true },
+    onSettled: () => client.invalidateQueries({ queryKey: categoryTreeKeys.all() }),
+  });
+}
+
+/** Offers a subject on a leaf: an existing one by id, or a new one by name. */
+export const useAttachSubject = () =>
+  useSubjectMutation(async ({ categoryId, ...body }: { categoryId: string } & ({ subjectId: string } | { name: string })) =>
+    (await api<unknown>(`${at(categoryId)}/subjects`, json('POST', body))).data);
+
+export const useSetLeafSubjectActive = () =>
+  useSubjectMutation(async ({ categoryId, subjectId, isActive }: { categoryId: string; subjectId: string; isActive: boolean }) =>
+    (await api<unknown>(`${at(categoryId)}/subjects/${encodeURIComponent(subjectId)}`, json('PATCH', { isActive }))).data);
+
+/** The server refuses (OFFERING_IN_USE) while a tutor, price or learner uses the subject. */
+export const useDetachSubject = () =>
+  useSubjectMutation(async ({ categoryId, subjectId }: { categoryId: string; subjectId: string }) => {
+    await api<null>(`${at(categoryId)}/subjects/${encodeURIComponent(subjectId)}`, { method: 'DELETE' });
   });

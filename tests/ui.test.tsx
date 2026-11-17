@@ -47,8 +47,8 @@ describe("TablePagination", () => {
       <TablePagination page={1} limit={6} total={214} noun="sessions" onPage={() => {}} />,
     );
     expect(html).toContain("Showing 1–6 of 214 sessions");
-    expect(html).toMatch(/disabled="">Previous/);
-    expect(html).not.toMatch(/disabled="">Next/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Previous/);
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Next/);
   });
   it("reports an empty result as 0–0", () => {
     const html = renderToStaticMarkup(

@@ -1,39 +1,19 @@
 "use client";
-import { Eye, EyeOff } from "lucide-react";
-import { forwardRef, useState, type ComponentProps, type ReactNode } from "react";
-import { Badge } from "@/components/shadcn/badge";
-import { Button } from "@/components/shadcn/button";
+import { AlertTriangle } from "lucide-react";
+import type { ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/shadcn/dialog";
-import { Input } from "@/components/shadcn/input";
 import { Label } from "@/components/shadcn/label";
 import { cn } from "@/lib/utils";
 
-/* Settings-style blocks (Figma Settings content, node 207:6913): a card of label / description / control rows. */
+/*
+ * The layout of a settings-style page (Figma Settings content, node 207:6913): a card of label / description /
+ * control rows, a save bar, and a note. These are layout only. The controls inside a row are the standard ones:
+ * Input, PhoneInput, NativeSelect, Button, Badge, StatusBadge; forms and dialogs use components/forms.
+ */
 
 export function SettingsPage({ children }: { children: ReactNode }) {
   return <div className="flex flex-col gap-6">{children}</div>;
 }
-
-export const SettingForm = forwardRef<
-  HTMLFormElement,
-  ComponentProps<"form"> & { pending?: boolean }
->(function SettingForm({ pending, children, ...props }, ref) {
-  return (
-    <form {...props} ref={ref} aria-busy={pending || undefined}>
-      <fieldset disabled={pending} className="contents">
-        {children}
-      </fieldset>
-    </form>
-  );
-});
 
 export function SettingCard({
   title,
@@ -59,12 +39,18 @@ export function SettingRow({
   label,
   description,
   htmlFor,
+  error,
+  narrow,
   children,
 }: {
   label: string;
   description?: ReactNode;
   /** Id of the control this row labels */
   htmlFor?: string;
+  /** Shown under the control, tied to it by the id `${htmlFor}-error` (set it as the control's aria-describedby) */
+  error?: string;
+  /** A short control, such as a number */
+  narrow?: boolean;
   children?: ReactNode;
 }) {
   return (
@@ -79,110 +65,38 @@ export function SettingRow({
         )}
         {description && <p className="text-xs text-muted-foreground">{description}</p>}
       </div>
-      {children && (
-        <div className="flex w-full max-w-full items-center gap-2 sm:w-80 sm:flex-none sm:justify-end">
-          {children}
+      {(children || error) && (
+        <div className={cn("flex w-full max-w-full flex-col gap-1 sm:flex-none", narrow ? "sm:w-44" : "sm:w-80")}>
+          {children && <div className="flex items-center gap-2 sm:justify-end [&>[data-slot=input]]:min-w-0 [&>[data-slot=input]]:flex-1">{children}</div>}
+          {error && (
+            <p id={htmlFor ? `${htmlFor}-error` : undefined} role="alert" className="text-xs text-error-foreground">
+              {error}
+            </p>
+          )}
         </div>
       )}
     </div>
   );
 }
 
+/** A note inside a card (a warning about how the settings apply). Errors belong in `FormError`. */
 export function SettingCallout({ children }: { children: ReactNode }) {
   return (
     <div
       role="note"
-      className="mt-1 mb-2 rounded-md border border-warning-border bg-warning-subtle px-4 py-3 text-sm text-warning-foreground"
+      className="mt-4 mb-2 flex items-start gap-3 rounded-md border border-warning-border bg-warning-subtle px-4 py-3 text-sm text-warning-foreground"
     >
-      {children}
+      <AlertTriangle aria-hidden className="mt-0.5 size-5 shrink-0" />
+      <div>{children}</div>
     </div>
   );
-}
-
-export const SettingInput = forwardRef<
-  HTMLInputElement,
-  ComponentProps<"input"> & { error?: string }
->(function SettingInput({ error, className, ...props }, ref) {
-  const errorId = error && props.id ? `${props.id}-error` : undefined;
-  return (
-    <div className="min-w-0 flex-1">
-      <Input
-        {...props}
-        ref={ref}
-        className={cn("text-base font-semibold read-only:bg-border-subtle read-only:text-text-secondary", className)}
-        aria-invalid={Boolean(error)}
-        aria-describedby={errorId}
-      />
-      {error && (
-        <p id={errorId} className="mt-1 text-xs text-error-foreground">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-});
-
-/** A native select styled like the inputs; the profile time-zone list is long and benefits from native search. */
-export function SettingSelect({ className, ...props }: ComponentProps<"select">) {
-  return (
-    <select
-      {...props}
-      className={cn(
-        "h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-base font-semibold outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
-        className,
-      )}
-    />
-  );
-}
-
-export function SettingButton({
-  variant = "secondary",
-  size,
-  pending,
-  pendingLabel = "Please wait…",
-  children,
-  type = "button",
-  disabled,
-  ...props
-}: Omit<ComponentProps<"button">, "children"> & {
-  variant?: "primary" | "secondary" | "ghost";
-  size?: "sm";
-  pending?: boolean;
-  pendingLabel?: string;
-  children: ReactNode;
-}) {
-  return (
-    <Button
-      {...props}
-      type={type}
-      variant={variant === "primary" ? "default" : variant === "ghost" ? "ghost" : "outline"}
-      size={size === "sm" ? "sm" : "default"}
-      disabled={disabled || pending}
-      aria-busy={pending || undefined}
-    >
-      {pending ? pendingLabel : children}
-    </Button>
-  );
-}
-
-export function SettingPill({
-  tone,
-  children,
-}: {
-  tone?: "warning";
-  children: ReactNode;
-}) {
-  return <Badge variant={tone === "warning" ? "warning" : "default"}>{children}</Badge>;
 }
 
 export function SettingPills({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap gap-1.5 sm:justify-end">{children}</div>;
 }
 
-export function SettingEmpty({ children }: { children: ReactNode }) {
-  return <p className="py-4 text-sm text-muted-foreground">{children}</p>;
-}
-
+/** The save bar at the bottom of a settings page: what changed, then Discard and Save. */
 export function StickyBar({
   message,
   children,
@@ -201,90 +115,5 @@ export function StickyBar({
       </p>
       {children}
     </Card>
-  );
-}
-
-/** A password input with a show/hide toggle. */
-export const SettingPasswordInput = forwardRef<
-  HTMLInputElement,
-  Omit<ComponentProps<"input">, "type"> & { error?: string }
->(function SettingPasswordInput({ error, ...props }, ref) {
-  const [visible, setVisible] = useState(false);
-  return (
-    <div className="relative min-w-0 flex-1">
-      <SettingInput
-        {...props}
-        ref={ref}
-        error={error}
-        type={visible ? "text" : "password"}
-        className="pr-10"
-      />
-      <button
-        type="button"
-        aria-label={visible ? "Hide password" : "Show password"}
-        aria-pressed={visible}
-        onClick={() => setVisible((value) => !value)}
-        className="absolute top-5 right-3 -translate-y-1/2 rounded-md text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-      >
-        {visible ? <EyeOff size={18} aria-hidden /> : <Eye size={18} aria-hidden />}
-      </button>
-    </div>
-  );
-});
-
-/** A modal dialog in the settings style: icon, title, description, content and a footer for actions. */
-export function SettingDialog({
-  open,
-  onClose,
-  title,
-  description,
-  icon,
-  footer,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  description: string;
-  icon: ReactNode;
-  footer: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent showCloseButton={false} className="gap-6 p-6 sm:max-w-md">
-        <DialogHeader className="flex-row items-start gap-4 text-left">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-pill bg-accent text-accent-foreground">
-            {icon}
-          </span>
-          <div className="flex flex-col gap-1">
-            <DialogTitle className="text-lg leading-[26px] font-semibold">{title}</DialogTitle>
-            <DialogDescription className="text-sm text-text-secondary">{description}</DialogDescription>
-          </div>
-        </DialogHeader>
-        <div>{children}</div>
-        {footer && <DialogFooter className="gap-2">{footer}</DialogFooter>}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/** A label above a control, for stacked forms such as the dialog. */
-export function SettingField({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={htmlFor} className="text-sm font-semibold">
-        {label}
-      </Label>
-      {children}
-    </div>
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 import { useId, useRef, useState, type KeyboardEvent } from "react";
-import { Link2, X } from "lucide-react";
+import { Link2, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { TextField } from "@/components/forms/field";
 import { Button } from "@/components/shadcn/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
 import { Input } from "@/components/shadcn/input";
+import { Kbd } from "@/components/shadcn/kbd";
 import { Label } from "@/components/shadcn/label";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api/contracts";
@@ -158,7 +159,8 @@ export function InviteTutorsModal({ open, onClose }: { open: boolean; onClose: (
       <DialogContent
         className="sm:max-w-lg"
         showCloseButton={!busy}
-        onInteractOutside={(event) => busy && event.preventDefault()}
+        // A stray click outside must not throw away addresses that were typed; Esc and the close button still do
+        onInteractOutside={(event) => (busy || emails.length > 0 || draft.trim()) && event.preventDefault()}
         onEscapeKeyDown={(event) => busy && event.preventDefault()}
       >
         <DialogHeader>
@@ -218,7 +220,12 @@ export function InviteTutorsModal({ open, onClose }: { open: boolean; onClose: (
 
             {emails.length > 0 && (
               <div className="flex flex-col gap-2">
-                <p className="text-xs font-semibold">Entered emails</p>
+                <p className="flex items-center justify-between text-xs font-semibold">
+                  Entered emails
+                  <span className="font-normal text-muted-foreground tabular-nums">
+                    {emails.length} of {MAX_INVITES_PER_REQUEST}
+                  </span>
+                </p>
                 <ul className="flex flex-wrap gap-2" aria-label={`Entered emails, ${emails.length} of ${MAX_INVITES_PER_REQUEST}`}>
                   {emails.map((email) => (
                     <li
@@ -245,10 +252,12 @@ export function InviteTutorsModal({ open, onClose }: { open: boolean; onClose: (
               </div>
             )}
 
-            <p id={helpId} className="text-xs text-muted-foreground">
-              You can invite multiple tutors at once. They will receive an email with a secure link to complete their
-              profile.
-            </p>
+            <div id={helpId} className="flex flex-col gap-1 text-xs text-muted-foreground">
+              <p>
+                To invite several tutors, press <Kbd>Enter</Kbd> after each address (pasting a list works too).
+              </p>
+              <p>They will receive an email with a secure link to complete their profile.</p>
+            </div>
           </div>
         )}
 
@@ -264,7 +273,8 @@ export function InviteTutorsModal({ open, onClose }: { open: boolean; onClose: (
                 onMouseDown={(event) => event.preventDefault()}
                 disabled={busy}
               >
-                <Link2 aria-hidden="true" />
+                {pendingAction !== "link" && <Link2 aria-hidden="true" />}
+                {pendingAction === "link" && <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />}
                 {pendingAction === "link" ? "Creating link…" : "Copy link"}
               </Button>
               <Button
@@ -273,7 +283,8 @@ export function InviteTutorsModal({ open, onClose }: { open: boolean; onClose: (
                 onMouseDown={(event) => event.preventDefault()}
                 disabled={busy}
               >
-                {pendingAction === "email" ? "Inviting…" : "Invite"}
+                {pendingAction === "email" && <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />}
+                {pendingAction === "email" ? "Inviting…" : emails.length > 1 ? `Invite ${emails.length} tutors` : "Invite"}
               </Button>
             </>
           )}

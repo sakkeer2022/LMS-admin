@@ -1,17 +1,22 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { MoreHorizontalIcon } from "lucide-react";
+import { CircleDot, IndianRupee, Layers, Loader2, MoreHorizontalIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/forms/confirm-dialog";
-import { FormError, SelectField, TextField } from "@/components/forms/field";
+import { FormError, TextField } from "@/components/forms/field";
+import { SearchInput } from "@/components/forms/search-input";
+import { StatusBadge } from "@/components/feedback/status-badge";
+import { Tip } from "@/components/feedback/tip";
+import { FilterChip } from "@/components/feedback/filter-chip";
+import { EmptyState } from "@/components/layout/empty-state";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/shadcn/select";
 import { TablePagination } from "@/components/data-table/table-pagination";
 import { PageHeader } from "@/components/layout/page-header";
 import { PanelMessage } from "@/components/layout/panel-message";
 import { usePermission } from "@/components/security/permission-provider";
-import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn/card";
+import { Card } from "@/components/shadcn/card";
 import { Checkbox } from "@/components/shadcn/checkbox";
 import {
   DropdownMenu,
@@ -48,6 +53,7 @@ import {
 import { awaitingKey, presetFor, visibleAwaiting } from "./awaiting-rows";
 import { PriceRuleDrawer, type TutorPricePreset } from "./price-rule-drawer";
 import { ResolutionPanel } from "./resolution-panel";
+import { SubjectCardReviewDialog, type CardUnderReview } from "./subject-card-review-dialog";
 
 const LIMIT = 20;
 const dateFormat = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
@@ -63,7 +69,7 @@ function useUrlFilters() {
     categoryId: params.get("category") ?? undefined,
     isActive: status === "all" ? undefined : status === "active",
     page: Math.max(1, Number(params.get("page")) || 1),
-    limit: LIMIT,
+    limit: [10, 20, 50].includes(Number(params.get("limit"))) ? Number(params.get("limit")) : LIMIT,
   };
   const set = (changes: Record<string, string | undefined>) => {
     const next = new URLSearchParams(params);
@@ -71,6 +77,7 @@ function useUrlFilters() {
       if (value) next.set(key, value);
       else next.delete(key);
     if (!("page" in changes)) next.delete("page");
+    if (next.get("limit") === String(LIMIT)) next.delete("limit");
     router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
   };
   return { filters, status, search: params.get("q") ?? "", set };
@@ -106,6 +113,9 @@ export function PricingPage() {
 
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const [deactivating, setDeactivating] = useState<PriceRule | null>(null);
+  // A subject card the tutor requested from their profile, being approved or rejected
+  const [cardReview, setCardReview] = useState<{ card: CardUnderReview; decision: "approve" | "reject" } | null>(null);
+  const canApproveCards = usePermission("faculty.approve");
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [edits, setEdits] = useState<PriceEdits>({});
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
@@ -155,6 +165,7 @@ export function PricingPage() {
   const rootName = filters.categoryId ? (roots.find((c) => c.id === filters.categoryId)?.name ?? null) : undefined;
   const newRows = visibleAwaiting(awaiting.data ?? [], { page: filters.page, status, q: filters.q, category: rootName });
   const awaitingTotal = awaiting.data?.length ?? 0;
+  const pendingCards = newRows.some((c) => c.cardStatus === "pending") || rows.some((r) => r.cardStatus === "pending");
   const rates = new Set(rows.map((r) => r.amounts.gstRateBps));
   const gstHeader = rates.size === 1 ? `GST ${formatBps([...rates][0])}` : "GST";
   const bulkMode = selected.size > 0;
@@ -261,99 +272,145 @@ export function PricingPage() {
         actions={addButton}
       />
       {canReadCatalogue && <ResolutionPanel offerings={offerings} />}
-      <Card className="overflow-hidden">
-        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-col gap-1.5">
-            <CardTitle>Price rules</CardTitle>
-            <CardDescription>
-              {bulkMode
-                ? `Editing ${selected.size} selected rule${selected.size === 1 ? "" : "s"} — GST and student total recalculate on save`
-                : newRows.length
-                  ? "Rows marked Not priced are tutors' subject cards without a price; the tutor can sign in once each has one. Select rows or click a session price to edit it."
-                  : "Select rules or click a session price to edit it. Student pays the session price plus GST."}
-            </CardDescription>
-          </div>
-          {bulkMode && (
-            <div className="flex flex-wrap items-start gap-2">
-              {selected.size > 1 && (
-                <form
-                  className="flex items-start gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    applyToSelected();
-                  }}
-                >
-                  <TextField
-                    label={`Set the session price of ${selected.size} selected rules`}
-                    labelHidden
-                    inputMode="decimal"
-                    placeholder="Set all to ₹"
-                    value={bulkInput}
-                    onChange={(e) => setBulkInput(e.target.value)}
-                    error={bulkError}
-                    containerClassName="w-32"
-                    className="h-8 text-right"
-                  />
-                  <Button type="submit" size="sm" variant="outline" disabled={!bulkParsed.ok || bulkParsed.paise <= 0}>
-                    Apply to {selected.size}
-                  </Button>
-                </form>
-              )}
-              <Button size="sm" variant="outline" onClick={requestClear} disabled={bulk.isPending}>
-                Clear selection
+      <Card className="gap-0 overflow-hidden">
+        {/* The same toolbar as every listing; the editing hint and bulk controls sit with it */}
+        <div className="flex flex-col gap-3 border-b border-border-subtle p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <SearchInput
+              label="Search price rules"
+              placeholder="Search tutor or category"
+              value={searchInput}
+              onChange={setSearchInput}
+              className="sm:w-72"
+            />
+            {/* Radix Select cannot hold an empty value, so "no category" is the word "all" */}
+            <Select value={filters.categoryId ?? "all"} onValueChange={(value) => set({ category: value === "all" ? undefined : value })}>
+              <SelectTrigger
+                aria-label="Filter by category"
+                className={cn("w-full bg-card sm:w-48 data-[size=default]:h-10", filters.categoryId && "border-primary bg-accent/40 font-medium")}
+              >
+                <Layers aria-hidden className={cn(filters.categoryId && "text-primary!")} />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper" className="max-h-72">
+                <SelectItem value="all">All categories</SelectItem>
+                {roots.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={status} onValueChange={(value) => set({ status: value === "active" ? undefined : value })}>
+              <SelectTrigger
+                aria-label="Filter by status"
+                className={cn("w-full bg-card sm:w-40 data-[size=default]:h-10", status !== "active" && "border-primary bg-accent/40 font-medium")}
+              >
+                <CircleDot aria-hidden className={cn(status !== "active" && "text-primary!")} />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="all">All statuses</SelectItem>
+              </SelectContent>
+            </Select>
+            {(filters.q || filters.categoryId || status !== "active") && (
+              <Button
+                variant="ghost"
+                className="text-text-secondary"
+                onClick={() => {
+                  setSearchInput("");
+                  set({ q: undefined, category: undefined, status: undefined });
+                }}
+              >
+                <X aria-hidden /> Clear filters
               </Button>
-            </div>
-          )}
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-3">
-          <TextField
-            label="Search"
-            type="search"
-            placeholder="Tutor or category"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-          <SelectField label="Category" value={filters.categoryId ?? ""} onChange={(e) => set({ category: e.target.value || undefined })}>
-            <option value="">All categories</option>
-            {roots.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </SelectField>
-          <SelectField
-            label="Status"
-            value={status}
-            onChange={(e) => set({ status: e.target.value === "active" ? undefined : e.target.value })}
-          >
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="all">All</option>
-          </SelectField>
-        </CardContent>
-        {rules.isPending ? (
-          <div className="flex flex-col gap-2 px-6 pb-6">
-            {Array.from({ length: 6 }, (_, i) => (
-              <Skeleton key={i} className="h-8 w-full" />
-            ))}
+            )}
+            {bulkMode && (
+              <div className="flex flex-wrap items-start gap-2 sm:ml-auto">
+                {selected.size > 1 && (
+                  <form
+                    className="flex items-start gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      applyToSelected();
+                    }}
+                  >
+                    <TextField
+                      label={`Set the session price of ${selected.size} selected rules`}
+                      labelHidden
+                      inputMode="decimal"
+                      placeholder="Set all to ₹"
+                      value={bulkInput}
+                      onChange={(e) => setBulkInput(e.target.value)}
+                      error={bulkError}
+                      containerClassName="w-32"
+                      className="h-8 text-right"
+                    />
+                    <Button type="submit" size="sm" variant="outline" disabled={!bulkParsed.ok || bulkParsed.paise <= 0}>
+                      Apply to {selected.size}
+                    </Button>
+                  </form>
+                )}
+                <Button size="sm" variant="outline" onClick={requestClear} disabled={bulk.isPending}>
+                  Clear selection
+                </Button>
+              </div>
+            )}
           </div>
+          {(filters.categoryId || status !== "active") && (
+            <ul aria-label="Active filters" className="flex flex-wrap items-center gap-2">
+              {filters.categoryId && (
+                <FilterChip
+                  label={roots.find((c) => c.id === filters.categoryId)?.name ?? "Category"}
+                  onRemove={() => set({ category: undefined })}
+                />
+              )}
+              {status !== "active" && (
+                <FilterChip label={`Status: ${status === "all" ? "All" : "Inactive"}`} onRemove={() => set({ status: undefined })} />
+              )}
+            </ul>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {bulkMode
+              ? `Editing ${selected.size} selected rule${selected.size === 1 ? "" : "s"}. GST and the student total recalculate on save.`
+              : `${newRows.length
+                  ? "Rows marked Not priced are tutors' subject cards without a price; the tutor can sign in once each has one. Select rows or click a session price to edit it."
+                  : "Select rules or click a session price to edit it. Student pays the session price plus GST."}${pendingCards ? " Pending approval: subject cards tutors added from their profile; price them, then approve them from the row menu." : ""}`}
+          </p>
+        </div>
+        {rules.isPending ? (
+          <>
+            <p role="status" className="flex items-center gap-2 border-b border-border-subtle bg-accent/30 px-5 py-2 text-xs font-medium text-accent-foreground">
+              <Loader2 aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
+              Loading…
+            </p>
+            <div className="flex flex-col gap-2 p-5">
+              {Array.from({ length: 6 }, (_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </>
         ) : rules.isError ? (
           <PanelMessage onRetry={() => void rules.refetch()}>
             Price rules could not be loaded. {describeApiError(rules.error, "view pricing").message}
           </PanelMessage>
         ) : rows.length === 0 && newRows.length === 0 ? (
-          <div className="flex flex-col items-start gap-3 px-6 pb-6">
-            <p className="text-sm">
-              {filters.q || filters.categoryId ? "No price rules match these filters." : "No price rules yet."}
-            </p>
-            {addButton}
+          <div className="p-6">
+            <EmptyState
+              icon={IndianRupee}
+              title={filters.q || filters.categoryId ? "No price rules match" : "No price rules yet"}
+              description={filters.q || filters.categoryId ? "Try a different search, or clear the filters." : "Add the first rule to start pricing sessions."}
+              action={addButton || undefined}
+            />
           </div>
         ) : (
           <>
-            <Table>
+            <Table className="[&_tr>:first-child]:pl-5 [&_tr>:last-child]:pr-5">
               <caption className="sr-only">{`Price rules, page ${filters.page}`}</caption>
               <TableHeader>
-                <TableRow className="hover:bg-transparent">
+                <TableRow className="bg-sunken/60 hover:bg-sunken/60 [&_th]:text-xs [&_th]:font-semibold [&_th]:tracking-wide [&_th]:text-text-secondary [&_th]:uppercase">
                   {canManage && (
                     <TableHead className="w-10">
                       <Checkbox
@@ -391,6 +448,11 @@ export function PricingPage() {
                       onEditPrice={() => editNewPrice(card)}
                       onInput={(input) => setInput(key, input)}
                       onSetPrice={() => setDrawer({ preset: presetFor(card) })}
+                      onRejectCard={
+                        canApproveCards && card.cardStatus === "pending"
+                          ? () => setCardReview({ decision: "reject", card: cardFromAwaiting(card) })
+                          : undefined
+                      }
                     />
                   );
                 })}
@@ -408,16 +470,22 @@ export function PricingPage() {
                     onInput={(input) => setInput(rule.id, input)}
                     onEdit={() => setDrawer({ rule })}
                     onDeactivate={() => setDeactivating(rule)}
+                    onReviewCard={
+                      canApproveCards && rule.cardStatus === "pending" && rule.cardId && rule.facultyId
+                        ? (decision) => setCardReview({ decision, card: cardFromRule(rule) })
+                        : undefined
+                    }
                   />
                 ))}
               </TableBody>
             </Table>
             <TablePagination
               page={filters.page}
-              limit={LIMIT}
+              limit={filters.limit}
               total={rules.data.meta?.total ?? rows.length}
               noun="price rules"
               onPage={(page) => set({ page: page > 1 ? String(page) : undefined })}
+              onLimit={(limit) => set({ limit: String(limit), page: undefined })}
             />
           </>
         )}
@@ -466,6 +534,14 @@ export function PricingPage() {
         />
       )}
       {deactivating && <DeactivateDialog rule={deactivating} onClose={() => setDeactivating(null)} />}
+      {cardReview && (
+        <SubjectCardReviewDialog
+          key={`${cardReview.card.cardId}-${cardReview.decision}`}
+          card={cardReview.card}
+          decision={cardReview.decision}
+          onClose={() => setCardReview(null)}
+        />
+      )}
       <ConfirmDialog
         open={confirmClear}
         title="Discard price changes?"
@@ -494,6 +570,7 @@ function PriceRow({
   onEditPrice,
   onEdit,
   onDeactivate,
+  onReviewCard,
 }: {
   rule: PriceRule;
   canManage: boolean;
@@ -506,6 +583,8 @@ function PriceRow({
   onEditPrice: () => void;
   onEdit: () => void;
   onDeactivate: () => void;
+  /** Present for a pending subject card the admin may approve or reject */
+  onReviewCard?: (decision: "approve" | "reject") => void;
 }) {
   const parsed = edit ? parseRupeesToPaise(edit.input) : undefined;
   // Edited rows show a muted preview; saved rows show the server's amounts
@@ -520,7 +599,7 @@ function PriceRow({
   return (
     <TableRow
       data-state={selected ? "selected" : undefined}
-      className={cn(selected && "bg-accent data-[state=selected]:bg-accent hover:bg-accent", error && "bg-error-subtle")}
+      className={cn("h-16", selected && "bg-accent data-[state=selected]:bg-accent hover:bg-accent", error && "bg-error-subtle")}
     >
       {canManage && (
         <TableCell>
@@ -532,9 +611,14 @@ function PriceRow({
           {tutor}
         </span>
         {!rule.isActive && (
-          <Badge variant="secondary" className="ml-2">
+          <StatusBadge status="inactive" className="ml-2">
             Inactive
-          </Badge>
+          </StatusBadge>
+        )}
+        {rule.cardStatus === "pending" && (
+          <StatusBadge status="processing" className="ml-2" title="Requested from the tutor's profile; approve it once priced">
+            Pending approval
+          </StatusBadge>
         )}
       </TableCell>
       <TableCell>
@@ -573,20 +657,32 @@ function PriceRow({
           formatPaise(rule.amounts.sessionPricePaise)
         )}
       </TableCell>
-      <TableCell className={cn("text-right", preview && "text-muted-foreground")}>{formatPaise(amounts.gstPaise)}</TableCell>
-      <TableCell className={cn("text-right font-semibold", preview && "font-normal text-muted-foreground")}>
+      <TableCell className={cn("text-right tabular-nums", preview && "text-muted-foreground")}>{formatPaise(amounts.gstPaise)}</TableCell>
+      <TableCell className={cn("text-right font-semibold tabular-nums", preview && "font-normal text-muted-foreground")}>
         {formatPaise(amounts.studentPaysPaise)}
       </TableCell>
       {canManage && (
         <TableCell className="w-12">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${name}`}>
-                <MoreHorizontalIcon />
-              </Button>
-            </DropdownMenuTrigger>
+            <Tip label="Actions">
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${name}`}>
+                  <MoreHorizontalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+            </Tip>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={onEdit}>Edit price</DropdownMenuItem>
+              {onReviewCard && (
+                <>
+                  <DropdownMenuItem onSelect={() => onReviewCard("approve")} disabled={!rule.isActive}>
+                    Approve subject card
+                  </DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive" onSelect={() => onReviewCard("reject")}>
+                    Reject subject card
+                  </DropdownMenuItem>
+                </>
+              )}
               {rule.isActive && (
                 <DropdownMenuItem variant="destructive" onSelect={onDeactivate}>
                   Deactivate
@@ -615,6 +711,7 @@ function NewPriceRow({
   onEditPrice,
   onInput,
   onSetPrice,
+  onRejectCard,
 }: {
   card: AwaitingPrice;
   canManage: boolean;
@@ -626,6 +723,8 @@ function NewPriceRow({
   onEditPrice: () => void;
   onInput: (value: string) => void;
   onSetPrice: () => void;
+  /** Present for a pending card requested from the profile (approve once it has a price) */
+  onRejectCard?: () => void;
 }) {
   const parsed = edit?.input.trim() ? parseRupeesToPaise(edit.input) : undefined;
   const preview = parsed?.ok && parsed.paise > 0 ? previewStudentPays(parsed.paise, card.defaultPrice?.gstRateBps ?? DEFAULT_GST_BPS) : null;
@@ -635,7 +734,7 @@ function NewPriceRow({
     <TableRow
       data-state={selected ? "selected" : undefined}
       className={cn(
-        "bg-warning-subtle/40 hover:bg-warning-subtle/60",
+        "h-16 bg-warning-subtle/40 hover:bg-warning-subtle/60",
         selected && "bg-accent data-[state=selected]:bg-accent hover:bg-accent",
         error && "bg-error-subtle",
       )}
@@ -647,9 +746,14 @@ function NewPriceRow({
       )}
       <TableCell className={cn("font-medium", !canManage && "border-l-2 border-l-warning-border")}>
         <span title={card.facultyEmail}>{card.facultyName}</span>
-        <Badge variant="warning" className="ml-2">
+        <StatusBadge status="pending" className="ml-2">
           Not priced
-        </Badge>
+        </StatusBadge>
+        {card.cardStatus === "pending" && (
+          <StatusBadge status="processing" className="ml-2" title="Requested from the tutor's profile; set the price, then approve it">
+            Pending approval
+          </StatusBadge>
+        )}
       </TableCell>
       <TableCell>
         <div className="flex min-w-0 flex-col">
@@ -693,19 +797,53 @@ function NewPriceRow({
       {canManage && (
         <TableCell className="w-12">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${name}`}>
-                <MoreHorizontalIcon />
-              </Button>
-            </DropdownMenuTrigger>
+            <Tip label="Actions">
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${name}`}>
+                  <MoreHorizontalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+            </Tip>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={onSetPrice}>Set price</DropdownMenuItem>
+              {onRejectCard && (
+                <>
+                  <DropdownMenuItem disabled title="Set the price first">
+                    Approve subject card
+                  </DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive" onSelect={onRejectCard}>
+                    Reject subject card
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
       )}
     </TableRow>
   );
+}
+
+function cardFromRule(rule: PriceRule): CardUnderReview {
+  return {
+    facultyId: rule.facultyId as string,
+    cardId: rule.cardId as string,
+    tutor: rule.facultyName ?? "Unknown tutor",
+    subject: rule.subjectName,
+    pathLabel: rule.pathLabel,
+    priced: rule.isActive,
+  };
+}
+
+function cardFromAwaiting(card: AwaitingPrice): CardUnderReview {
+  return {
+    facultyId: card.facultyId,
+    cardId: card.cardId,
+    tutor: card.facultyName,
+    subject: card.subject,
+    pathLabel: card.pathLabel,
+    priced: false,
+  };
 }
 
 function DeactivateDialog({ rule, onClose }: { rule: PriceRule; onClose: () => void }) {

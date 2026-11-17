@@ -1,20 +1,25 @@
 "use client";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
+import { FormError } from "@/components/forms/field";
+import { Form } from "@/components/forms/form";
+import { PendingButton } from "@/components/forms/pending-button";
+import { PhoneInput } from "@/components/forms/phone-input";
+import { StatusBadge } from "@/components/feedback/status-badge";
+import { PanelMessage } from "@/components/layout/panel-message";
 import {
-  SettingButton,
-  SettingCallout,
   SettingCard,
-  SettingEmpty,
-  SettingForm,
-  SettingInput,
-  SettingPill,
   SettingPills,
   SettingRow,
-  SettingSelect,
   SettingsPage,
   StickyBar,
 } from "@/components/settings/setting-layout";
+import { Badge } from "@/components/shadcn/badge";
+import { Button } from "@/components/shadcn/button";
+import { Input } from "@/components/shadcn/input";
+import { NativeSelect } from "@/components/shadcn/native-select";
+import { Skeleton } from "@/components/shadcn/skeleton";
 import {
   useActivity,
   useLogout,
@@ -26,10 +31,28 @@ import {
 } from "@/features/auth/api/auth";
 import { ApiError } from "@/lib/api/contracts";
 import { permissionsOf } from "@/lib/auth/access";
+import { useServedCountries } from "@/lib/regions";
 import { describeDevice } from "@/lib/auth/device";
 import { ChangePasswordDialog } from "./change-password-dialog";
 import { ACTIVITY_LABELS, WARNING_ACTIONS } from "./labels";
 import { profileSchema, type ProfileValues } from "./schema";
+
+/** Rows shaped like the settings rows while a card's list loads. */
+function ListSkeleton({ label }: { label: string }) {
+  return (
+    <div role="status" aria-label={label} className="flex flex-col gap-4 py-4">
+      {[0, 1, 2].map((row) => (
+        <div key={row} className="flex items-center gap-6">
+          <div className="flex flex-1 flex-col gap-1.5">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-3 w-72 max-w-full" />
+          </div>
+          <Skeleton className="h-8 w-24" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function zoneNames(current?: string | null) {
   const names =
@@ -101,6 +124,7 @@ function DetailsCard() {
     (k) => values[k] !== initial[k],
   );
   const zones = useMemo(() => zoneNames(user.timezone), [user.timezone]);
+  const countries = useServedCountries();
 
   useEffect(() => {
     if (dirty) setSaved(false);
@@ -142,7 +166,7 @@ function DetailsCard() {
   }
 
   return (
-    <SettingForm
+    <Form
       onSubmit={submit}
       noValidate
       aria-label="Personal details"
@@ -156,15 +180,17 @@ function DetailsCard() {
           label="Full name"
           htmlFor="fullName"
           description="The name on your admin account."
+          error={errors.fullName}
         >
-          <SettingInput
+          <Input
             id="fullName"
             value={values.fullName}
             onChange={(e) => set("fullName")(e.target.value)}
             autoComplete="name"
             maxLength={150}
             required
-            error={errors.fullName}
+            aria-invalid={Boolean(errors.fullName) || undefined}
+            aria-describedby={errors.fullName ? "fullName-error" : undefined}
           />
         </SettingRow>
         <SettingRow
@@ -172,25 +198,24 @@ function DetailsCard() {
           htmlFor="email"
           description="Used to sign in. Changing it needs email verification, which arrives with account recovery."
         >
-          <SettingInput id="email" value={user.email} readOnly />
-          <SettingPill tone={user.emailVerified ? undefined : "warning"}>
+          <Input id="email" value={user.email} readOnly />
+          <StatusBadge status={user.emailVerified ? "approved" : "pending"}>
             {user.emailVerified ? "Verified" : "Not verified"}
-          </SettingPill>
+          </StatusBadge>
         </SettingRow>
         <SettingRow
           label="Mobile number"
           htmlFor="mobileNumber"
-          description="International format, including the country code. Optional."
+          description="Choose the country code, then enter the number. Optional."
+          error={errors.mobileNumber}
         >
-          <SettingInput
+          <PhoneInput
             id="mobileNumber"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="+919876543210"
+            countries={countries}
             value={values.mobileNumber ?? ""}
-            onChange={(e) => set("mobileNumber")(e.target.value)}
-            error={errors.mobileNumber}
+            onChange={(mobileNumber) => set("mobileNumber")(mobileNumber)}
+            invalid={Boolean(errors.mobileNumber)}
+            describedBy={errors.mobileNumber ? "mobileNumber-error" : undefined}
           />
         </SettingRow>
         <SettingRow
@@ -198,7 +223,8 @@ function DetailsCard() {
           htmlFor="timezone"
           description="Dates and times on this page are shown in this zone."
         >
-          <SettingSelect
+          {/* Native on purpose: about 400 zones, and the browser's own list lets you type to find one */}
+          <NativeSelect
             id="timezone"
             value={values.timezone ?? ""}
             onChange={(e) => set("timezone")(e.target.value)}
@@ -209,13 +235,9 @@ function DetailsCard() {
                 {zone}
               </option>
             ))}
-          </SettingSelect>
+          </NativeSelect>
         </SettingRow>
-        {errors.form && (
-          <SettingCallout>
-            <span role="alert">{errors.form}</span>
-          </SettingCallout>
-        )}
+        <FormError message={errors.form} className="my-3" />
       </SettingCard>
       <StickyBar
         message={
@@ -226,7 +248,7 @@ function DetailsCard() {
               : "No unsaved changes"
         }
       >
-        <SettingButton
+        <Button
           variant="ghost"
           disabled={!dirty || update.isPending}
           onClick={() => {
@@ -235,18 +257,12 @@ function DetailsCard() {
           }}
         >
           Discard
-        </SettingButton>
-        <SettingButton
-          variant="primary"
-          type="submit"
-          disabled={!dirty}
-          pending={update.isPending}
-          pendingLabel="Saving…"
-        >
+        </Button>
+        <PendingButton type="submit" disabled={!dirty} pending={update.isPending} pendingLabel="Saving…">
           Save changes
-        </SettingButton>
+        </PendingButton>
       </StickyBar>
-    </SettingForm>
+    </Form>
   );
 }
 
@@ -267,9 +283,9 @@ function AccessCard() {
       >
         <SettingPills>
           {user.roles.map((role) => (
-            <SettingPill key={role.id}>
+            <Badge key={role.id}>
               {role.name === "admin" ? "Administrator" : role.name}
-            </SettingPill>
+            </Badge>
           ))}
         </SettingPills>
       </SettingRow>
@@ -282,16 +298,12 @@ function AccessCard() {
         ) : (
           <SettingPills>
             {shown.map((name) => (
-              <SettingPill key={name}>{name}</SettingPill>
+              <Badge key={name}>{name}</Badge>
             ))}
             {permissions.length > 12 && (
-              <SettingButton
-                variant="ghost"
-                size="sm"
-                onClick={() => setAll(!all)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setAll(!all)}>
                 {all ? "Show fewer" : `Show all ${permissions.length}`}
-              </SettingButton>
+              </Button>
             )}
           </SettingPills>
         )}
@@ -309,9 +321,20 @@ function SecurityCard({
   lastLoginAt?: string | null;
   format: Intl.DateTimeFormat;
 }) {
-  const [changing, setChanging] = useState(false);
+  // Sent here by an admin-set password: the dialog opens by itself and the rest of the portal is closed
+  const forced = useSearchParams().get("change-password") === "1";
+  const [changing, setChanging] = useState(forced);
   return (
     <SettingCard title="Sign-in and security" caption="Protect your account">
+      {forced && (
+        <p
+          role="note"
+          className="rounded-md border border-info-foreground/20 bg-info-subtle px-4 py-3 text-sm text-info-foreground"
+        >
+          You are using a password an administrator set. Choose your own to
+          continue; you will be asked to sign in again.
+        </p>
+      )}
       <SettingRow
         label="Last sign-in"
         description="The most recent successful sign-in to your account."
@@ -326,9 +349,9 @@ function SecurityCard({
         label="Password"
         description="Changing your password signs you out everywhere."
       >
-        <SettingButton onClick={() => setChanging(true)}>
+        <Button variant="outline" onClick={() => setChanging(true)}>
           Change password
-        </SettingButton>
+        </Button>
       </SettingRow>
       <ChangePasswordDialog
         email={email}
@@ -351,9 +374,9 @@ function DevicesCard({ format }: { format: Intl.DateTimeFormat }) {
       caption="Each browser you are signed in on. Sign out any you do not recognise."
     >
       {sessions.isPending ? (
-        <SettingEmpty>Loading devices…</SettingEmpty>
+        <ListSkeleton label="Loading devices" />
       ) : sessions.isError ? (
-        <SettingEmpty>Unable to load your devices.</SettingEmpty>
+        <PanelMessage onRetry={() => void sessions.refetch()}>Unable to load your devices.</PanelMessage>
       ) : (
         list.map((session) => (
           <SettingRow
@@ -361,8 +384,9 @@ function DevicesCard({ format }: { format: Intl.DateTimeFormat }) {
             label={describeDevice(session.userAgent)}
             description={`Signed in ${format.format(new Date(session.createdAt))} · expires ${format.format(new Date(session.expiresAt))}`}
           >
-            {session.isCurrent && <SettingPill>This device</SettingPill>}
-            <SettingButton
+            {session.isCurrent && <Badge>This device</Badge>}
+            <PendingButton
+              variant="outline"
               size="sm"
               pending={
                 revoke.isPending && revoke.variables?.jti === session.jti
@@ -371,40 +395,35 @@ function DevicesCard({ format }: { format: Intl.DateTimeFormat }) {
               onClick={() => revoke.mutate(session)}
             >
               Sign out
-            </SettingButton>
+            </PendingButton>
           </SettingRow>
         ))
       )}
-      {(revoke.isError || revokeOthers.isError) && (
-        <SettingCallout>
-          <span role="alert">Could not sign out. Try again.</span>
-        </SettingCallout>
-      )}
+      <FormError
+        message={revoke.isError || revokeOthers.isError ? "Could not sign out. Try again." : undefined}
+        className="my-3"
+      />
       <SettingRow
         label="Other devices"
         description="Keeps this device signed in and ends every other session."
       >
-        <SettingButton
+        <PendingButton
+          variant="outline"
           disabled={list.length < 2}
           pending={revokeOthers.isPending}
           pendingLabel="Signing out…"
           onClick={() => revokeOthers.mutate()}
         >
           Sign out of all other devices
-        </SettingButton>
+        </PendingButton>
       </SettingRow>
       <SettingRow
         label="This session"
         description="Ends your session on this device."
       >
-        <SettingButton
-          variant="primary"
-          pending={logout.isPending}
-          pendingLabel="Signing out…"
-          onClick={() => logout.mutate()}
-        >
+        <PendingButton pending={logout.isPending} pendingLabel="Signing out…" onClick={() => logout.mutate()}>
           Log out
-        </SettingButton>
+        </PendingButton>
       </SettingRow>
     </SettingCard>
   );
@@ -419,11 +438,11 @@ function ActivityCard({ format }: { format: Intl.DateTimeFormat }) {
       caption="Your latest sign-ins and security events"
     >
       {activity.isPending ? (
-        <SettingEmpty>Loading activity…</SettingEmpty>
+        <ListSkeleton label="Loading activity" />
       ) : activity.isError ? (
-        <SettingEmpty>Unable to load your activity.</SettingEmpty>
+        <PanelMessage onRetry={() => void activity.refetch()}>Unable to load your activity.</PanelMessage>
       ) : events.length === 0 ? (
-        <SettingEmpty>No activity yet.</SettingEmpty>
+        <p className="py-4 text-sm text-muted-foreground">No activity yet.</p>
       ) : (
         events.map((event) => (
           <SettingRow
@@ -438,7 +457,7 @@ function ActivityCard({ format }: { format: Intl.DateTimeFormat }) {
               .join(" · ")}
           >
             {WARNING_ACTIONS.has(event.action) && (
-              <SettingPill tone="warning">Review</SettingPill>
+              <StatusBadge status="pending">Review</StatusBadge>
             )}
           </SettingRow>
         ))

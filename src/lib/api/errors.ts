@@ -19,6 +19,14 @@ const STALE_CODES = new Set(['STALE_VERSION', 'STALE_SIBLINGS', 'CONCURRENT_CHAN
 /** Turns any thrown error into a readable message plus field errors for forms. */
 export function describeApiError(error: unknown, action = 'do this'): DescribedError {
   if (!(error instanceof ApiError)) {
+    // A response that failed the schema check: its message is a JSON dump, not something to show an administrator
+    if (error instanceof Error && error.name === 'ZodError') {
+      return {
+        kind: 'other',
+        message: 'The server answered in an unexpected format. Refresh the page; if it keeps happening, tell the development team.',
+        fields: {},
+      };
+    }
     return { kind: 'other', message: error instanceof Error ? error.message : 'Something went wrong', fields: {} };
   }
   const fields: Record<string, string> = {};

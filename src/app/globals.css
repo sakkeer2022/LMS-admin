@@ -140,4 +140,26 @@
   body {
     @apply bg-background font-sans text-sm text-foreground antialiased;
   }
+  /* Tailwind 4 resets buttons to the default cursor; anything pressable shows the hand */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="option"],
+  [role="menuitem"],
+  [role="checkbox"],
+  [role="switch"],
+  select:not(:disabled),
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
+}
+
+/* Entrance motion for the roles and permission cards; skipped when the person has asked for reduced motion. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .anim-rise { animation: rise-in 0.35s ease-out both; animation-delay: calc(var(--i, 0) * 45ms); }
 }

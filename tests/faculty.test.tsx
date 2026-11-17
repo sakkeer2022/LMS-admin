@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup as renderMarkup } from "react-dom/server";
+import type { ReactElement } from "react";
+import { TooltipProvider } from "../src/components/shadcn/tooltip";
+
+// Row menus and copy buttons use tooltips, which need their provider (the app supplies it in providers.tsx)
+const renderToStaticMarkup = (ui: ReactElement) => renderMarkup(<TooltipProvider>{ui}</TooltipProvider>);
 import {
   EMAIL_PATTERN,
   MAX_INVITES_PER_REQUEST,
@@ -53,9 +58,11 @@ const profile: FacultyListItem = {
   fullName: "Anjali Deshpande",
   email: "anjali.deshpande@gmail.com",
   status: "pending",
+  verification: "new",
+  isActive: true,
   subjects: ["Physics", "Chemistry"],
   qualification: "Ph.D. · IIT Bombay",
-  documents: { uploaded: 4, required: 4 },
+  documents: { uploaded: 4, required: 4, additional: 0 },
   pricing: "none",
   appliedAt: "2026-08-28T09:00:00Z",
   invitation: null,
@@ -67,6 +74,8 @@ const invitation: FacultyListItem = {
   fullName: null,
   email: "ananya.iyer@gmail.com",
   status: "invited",
+  verification: null,
+  isActive: null,
   subjects: [],
   qualification: null,
   documents: null,
@@ -158,7 +167,7 @@ describe("email chips", () => {
 
 describe("URL filters", () => {
   it("defaults to the All tab, newest first, page 1", () => {
-    expect(filtersFromParams(new URLSearchParams())).toEqual({ tab: "all", sort: "recent", page: 1 });
+    expect(filtersFromParams(new URLSearchParams())).toEqual({ tab: "all", sort: "recent", page: 1, limit: 20 });
   });
   it("accepts the dashboard's capitalised filter and ignores junk", () => {
     expect(filtersFromParams(new URLSearchParams("filter=Pending&page=3&sort=name"))).toMatchObject({
@@ -170,20 +179,25 @@ describe("URL filters", () => {
       tab: "all",
       sort: "recent",
       page: 1,
+      limit: 20,
     });
+  });
+  it("accepts only the shared page sizes", () => {
+    expect(filtersFromParams(new URLSearchParams("limit=50")).limit).toBe(50);
+    expect(filtersFromParams(new URLSearchParams("limit=7")).limit).toBe(20);
   });
   it("keeps a valid category and search", () => {
     const f = filtersFromParams(new URLSearchParams("category=8c121988-8afa-4fb7-b6eb-9b0dcb94f730&search=%20rao%20"));
     expect(f).toMatchObject({ categoryId: "8c121988-8afa-4fb7-b6eb-9b0dcb94f730", search: "rao" });
   });
-  it("builds the list query with a page size of 7", () => {
-    expect(listQuery({ tab: "verified", sort: "oldest", page: 2 })).toEqual({
+  it("builds the list query with the default page size of 20", () => {
+    expect(listQuery({ tab: "verified", sort: "oldest", page: 2, limit: 20 })).toEqual({
       status: "verified",
       sort: "oldest",
       categoryId: undefined,
       search: undefined,
       page: "2",
-      limit: "7",
+      limit: "20",
     });
   });
 });
@@ -209,8 +223,8 @@ describe("row presentation", () => {
   it("summarises the header and the footer", () => {
     expect(headerSummary({ all: 118, pending: 7 })).toBe("118 tutor profiles · 7 awaiting verification");
     expect(headerSummary({ all: 1, pending: 0 })).toBe("1 tutor profile · 0 awaiting verification");
-    expect(rangeLabel(1, 118)).toBe("Showing 1–7 of 118 tutors");
-    expect(rangeLabel(17, 118)).toBe("Showing 113–118 of 118 tutors");
+    expect(rangeLabel(1, 118)).toBe("Showing 1–20 of 118 tutors");
+    expect(rangeLabel(6, 118)).toBe("Showing 101–118 of 118 tutors");
     expect(rangeLabel(1, 0)).toBe("Showing 0–0 of 0 tutors");
     expect(rangeLabel(1, 1)).toBe("Showing 1–1 of 1 tutor");
   });
@@ -236,27 +250,29 @@ describe("row presentation", () => {
     expect(canDecide({ approvalStatus: "rejected" })).toBe(false);
   });
   it("explains empty results", () => {
-    expect(emptyMessage({ tab: "all", sort: "recent", page: 1 })).toBe("No tutors yet. Invite a tutor to start onboarding.");
-    expect(emptyMessage({ tab: "suspended", sort: "recent", page: 1 })).toBe("No suspended tutors.");
-    expect(emptyMessage({ tab: "pending", sort: "recent", page: 1, search: "rao" })).toBe('No tutors match "rao".');
-    expect(emptyMessage({ tab: "all", sort: "recent", page: 1, categoryId: "c" })).toBe(
+    expect(emptyMessage({ tab: "all", sort: "recent", page: 1, limit: 20 })).toBe("No tutors yet. Invite a tutor to start onboarding.");
+    expect(emptyMessage({ tab: "suspended", sort: "recent", page: 1, limit: 20 })).toBe("No suspended tutors.");
+    expect(emptyMessage({ tab: "pending", sort: "recent", page: 1, limit: 20, search: "rao" })).toBe('No tutors match "rao".');
+    expect(emptyMessage({ tab: "all", sort: "recent", page: 1, limit: 20, categoryId: "c" })).toBe(
       "No tutors are assigned to this category yet.",
     );
   });
 });
 
 describe("row actions", () => {
-  it("offers view, edit, suspend and delete for profiles and calls the handler", () => {
+  it("offers view, edit, deactivate and delete for profiles and calls the handler", () => {
     const onAction = vi.fn();
     const items = rowActions(profile, onAction);
-    expect(items.map((i) => i.label)).toEqual(["Review application", "Edit", "Suspend", "Delete"]);
+    expect(items.map((i) => i.label)).toEqual(["Review application", "Edit", "Deactivate", "Delete"]);
     expect(rowActions({ ...profile, status: "verified" }, onAction)[0]!.label).toBe("View profile");
     expect(items.find((i) => i.id === "delete")?.destructive).toBe(true);
     items[2]!.onSelect();
-    expect(onAction).toHaveBeenCalledWith("suspend", profile);
+    expect(onAction).toHaveBeenCalledWith("deactivate", profile);
   });
-  it("disables Suspend for a suspended tutor", () => {
-    expect(rowActions({ ...profile, status: "suspended" }, vi.fn()).find((i) => i.id === "suspend")?.disabled).toBe(true);
+  it("offers Activate for an inactive tutor, separate from verification", () => {
+    const items = rowActions({ ...profile, status: "suspended", isActive: false, verification: "approved" }, vi.fn());
+    expect(items.map((i) => i.id)).toContain("activate");
+    expect(items.map((i) => i.id)).not.toContain("deactivate");
   });
   it("offers resend and revoke for invitations", () => {
     expect(rowActions(invitation, vi.fn()).map((i) => i.label)).toEqual(["Resend invitation", "Revoke invitation"]);
@@ -272,7 +288,7 @@ const table = (rows: FacultyListItem[]) =>
 describe("rendering", () => {
   it("renders a profile row with every column and an accessible action menu", () => {
     const html = table([profile]);
-    for (const text of ["Anjali Deshpande", "anjali.deshpande@gmail.com", "Physics · Chemistry", "Ph.D. · IIT Bombay", "4 of 4", "28 Aug", "Pending"])
+    for (const text of ["Anjali Deshpande", "anjali.deshpande@gmail.com", "Physics · Chemistry", "Ph.D. · IIT Bombay", "4 of 4", "28 Aug", "New", "Pending"])
       expect(html).toContain(text);
     expect(html).toContain('aria-label="Actions for Anjali Deshpande"');
     expect(html).toContain('aria-haspopup="menu"');
@@ -289,10 +305,10 @@ describe("rendering", () => {
     expect(html).toContain("Price pending");
   });
   it("uses the design's column order", () => {
-    expect(FACULTY_TABLE_HEADERS).toEqual(["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Status", ""]);
+    expect(FACULTY_TABLE_HEADERS).toEqual(["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Verification", "Status", ""]);
     const html = table([profile]);
     const headers = [...html.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => m[1]!.replace(/<[^>]+>/g, ""));
-    expect(headers).toEqual(["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Status", "Actions"]);
+    expect(headers).toEqual(["Tutor", "Subjects", "Qualification", "Documents", "Applied", "Verification", "Status", "Actions"]);
   });
   it.each([
     ["verified", "success", "Verified"],
@@ -340,6 +356,7 @@ const detail: FacultyDetail = {
   appliedAt: "2026-11-04T09:00:00Z",
   submittedAt: "2026-11-04T09:00:00Z",
   status: "pending",
+  verification: "new",
   approvalStatus: "pending",
   isPublished: false,
   isActive: true,
@@ -351,17 +368,20 @@ const detail: FacultyDetail = {
     studiedAt: "University of Pune",
     teachingExperience: { code: "3-5", label: "3–5 years" },
     offersOfflineClasses: true,
+    teachingMode: { code: "hybrid", label: "Hybrid (Both Online & Offline)" },
   },
+  reupload: null,
   documents: [
-    { id: "d1", type: "GOVERNMENT_ID", label: "Photo ID", fileName: "id.pdf", mimeType: "application/pdf", fileSize: 2048, uploadedAt: "2026-11-04T09:00:00Z", isVerified: false, verifiedAt: null, scanStatus: "pending", previewable: true },
-    { id: "d2", type: "PAN_CARD", label: "PAN card", fileName: "pan.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", fileSize: 4096, uploadedAt: "2026-11-04T09:00:00Z", isVerified: true, verifiedAt: "2026-11-04T10:00:00Z", scanStatus: "pending", previewable: false },
+    { id: "d1", type: "GOVERNMENT_ID", label: "Photo ID", fileName: "id.pdf", mimeType: "application/pdf", fileSize: 2048, uploadedAt: "2026-11-04T09:00:00Z", isVerified: false, verifiedAt: null, scanStatus: "pending", previewable: true, required: true },
+    { id: "d2", type: "PAN_CARD", label: "PAN card", fileName: "pan.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", fileSize: 4096, uploadedAt: "2026-11-04T09:00:00Z", isVerified: true, verifiedAt: "2026-11-04T10:00:00Z", scanStatus: "pending", previewable: false, required: true },
   ],
   subjects: [
-    { assignmentId: "a1", curriculumId: "c1", subject: "Physics", pathLabel: "Academic › School › K-12 › CBSE › Class 11", sessionPricePaise: null, studentPaysPaise: null },
-    { assignmentId: "a2", curriculumId: "c2", subject: "Chemistry", pathLabel: "Academic › School › K-12 › CBSE › Class 11", sessionPricePaise: 80000, studentPaysPaise: 94400 },
+    { assignmentId: "a1", curriculumId: "c1", subject: "Physics", pathLabel: "Academic › School › K-12 › CBSE › Class 11", status: "approved", source: "onboarding", sessionPricePaise: null, studentPaysPaise: null },
+    { assignmentId: "a2", curriculumId: "c2", subject: "Chemistry", pathLabel: "Academic › School › K-12 › CBSE › Class 11", status: "approved", source: "onboarding", sessionPricePaise: 80000, studentPaysPaise: 94400 },
   ],
   pricing: "none",
   consentDecidedAt: null,
+  consentSigned: false,
 };
 
 function wrap(children: ReactNode, permissions = ["faculty.read", "faculty.approve", "faculty.documents"]) {

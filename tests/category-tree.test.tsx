@@ -10,8 +10,11 @@ import {
   projectDrop, relocation, rowCount, rowCountLabel, searchMatches, uniqueSiblingCode, visibleRows,
 } from '../src/lib/api/category-tree-model';
 import { Switch } from '../src/components/shadcn/switch';
+import { TooltipProvider } from '../src/components/shadcn/tooltip';
 import { CategoryTreeList } from '../src/features/category-tree/components/category-tree-list';
 import { PermissionProvider } from '../src/components/security/permission-provider';
+import { leafSubjectSchema } from '../src/lib/api/category-tree';
+import { pickerOfferings } from '../src/lib/api/offering-tree';
 import { CategoryDetailView, CategoryForm } from '../src/features/category-tree/components/category-detail-panel';
 import { CategoryTreePage } from '../src/features/category-tree/components/category-tree-page';
 
@@ -162,10 +165,10 @@ describe('drag and drop (reorder mode)', () => {
 
 describe('category tree list', () => {
   const rows = visibleRows(buildTree(nodes), new Set([academic.id, school.id]));
-  const render = (reorder: boolean, canManage = true) => renderToStaticMarkup(<CategoryTreeList rows={rows} nodes={nodes}
+  const render = (reorder: boolean, canManage = true) => renderToStaticMarkup(<TooltipProvider><CategoryTreeList rows={rows} nodes={nodes}
     expanded={new Set([academic.id, school.id])} onToggle={() => undefined} selectedId={k12.id} onSelect={() => undefined} reorder={reorder}
     onRelocate={() => undefined} onInvalidDrop={() => undefined} canManage={canManage} pendingIds={new Set([university.id])}
-    onEdit={() => undefined} onDelete={() => undefined} onToggleActive={() => undefined} />);
+    onEdit={() => undefined} onDelete={() => undefined} onToggleActive={() => undefined} /></TooltipProvider>);
 
   it('shows the switch, Edit and Delete only on the selected row, as in the design', () => {
     const html = render(false);
@@ -259,5 +262,30 @@ describe('category tree page', () => {
 
   it('refuses without catalogue.read', () => {
     expect(wrap(<CategoryTreePage />, [])).toContain('permission to view the catalogue');
+  });
+});
+
+describe('Leaf subjects', () => {
+  it('parses a leaf subject with its usage', () => {
+    const live = { curriculumId: 'c1', subjectId: 's1', name: 'Physics', isActive: true, subjectActive: true, tutors: 2, prices: 1, learners: 0 };
+    expect(leafSubjectSchema.parse(live).tutors).toBe(2);
+  });
+
+  it('labels a picker offering by the leaf path and the subject', () => {
+    const tree = {
+      nodes: [
+        { id: 'a', parentId: null, name: 'School', isLeaf: false },
+        { id: 'b', parentId: 'a', name: 'Class 11', isLeaf: true },
+      ],
+      offerings: [{ curriculumId: 'c1', categoryId: 'b', board: null, level: null, subject: { id: 's1', name: 'Physics' } }],
+    };
+    expect(pickerOfferings(tree)[0]).toMatchObject({ label: 'School › Class 11 › Physics', subject: 'Physics' });
+  });
+
+  it('shows the Subjects section on a leaf and not on a branch', () => {
+    const view = (n: CategoryNode) => wrap(<CategoryDetailView detail={{ ...liveDetail, ...n }} node={n} canManage pending={false}
+      onAddChild={() => {}} onEdit={() => {}} onDelete={() => {}} onToggleActive={() => {}} />);
+    expect(view(university)).toContain('Subjects');
+    expect(view(school)).not.toContain('Subjects');
   });
 });

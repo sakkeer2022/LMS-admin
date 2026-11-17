@@ -12,6 +12,8 @@ cp .env.example .env.local   # BACKEND_ORIGIN points at the API (default http://
 npm run dev                  # http://localhost:3001
 ```
 
+Open the app at `http://admin.localhost:<port>` (this one: `http://admin.localhost:3001`), not `http://localhost:<port>`. Browsers share cookies between ports on one host, so a session started in another portal on plain `localhost` would replace this one. The backend also scopes its session cookies by portal (the `x-portal` header the API client sends).
+
 The backend (`amentorz-backend`) must allow `http://localhost:3001` in `ALLOWED_ORIGINS` (the local default does). The Next `/api/v1` rewrite keeps the auth cookies same-origin.
 
 ```bash

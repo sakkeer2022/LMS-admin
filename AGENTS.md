@@ -30,6 +30,7 @@ This repo is one of four: `amentorz-backend` (Express 5, Prisma 7, PostgreSQL AP
 
 - The UI design is final. A change must not alter what a screen shows or collects. If it would, raise it as a pending decision (`amentorz-backend/docs/PENDING_DECISIONS.md`) instead.
 - Theme, tokens and components come from the approved design. Do not invent styles.
+- For any frontend work (page, component, form, dialog, layout, responsive behaviour) follow the `amentorz-ui-standards` skill (`.claude/skills/amentorz-ui-standards/`; its `references/` hold the tokens, component inventory, shadcn/ui rules, form and dialog patterns). Existing code in this repo wins over generic design habits: inspect the existing components first and prefer the installed shadcn/ui primitives. For list, table, drawer or detail screens, and any polish pass, follow `references/interaction-patterns.md` in that skill; `src/features/students/` is the reference implementation.
 - India (`IN`) and the UAE (`AE`) are both in scope. Never hard-code a country, dialling code, time zone, currency or age rule; follow `amentorz-backend/src/docs/REGIONS.md`. All money is INR.
 - Check `src/components/shadcn`, `src/components/layout` and `src/lib` before writing a helper or a component, and reuse what exists.
 - Do not start the LMS-99 email and OTP work without asking.

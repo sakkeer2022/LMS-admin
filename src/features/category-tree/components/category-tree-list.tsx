@@ -7,7 +7,8 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS as DndCSS } from '@dnd-kit/utilities';
 import { BookOpen, ChevronDown, ChevronRight, FileText, Folder, GripVertical, LayoutList, Pencil, Trash2 } from 'lucide-react';
-import { Badge } from '@/components/shadcn/badge';
+import { StatusBadge } from '@/components/feedback/status-badge';
+import { Tip } from '@/components/feedback/tip';
 import { Button } from '@/components/shadcn/button';
 import { Switch } from '@/components/shadcn/switch';
 import { cn as cx } from '@/lib/utils';
@@ -260,14 +261,18 @@ function SortableRow({ row, list, focused, projectedDepth, invalid, onFocusRow }
     onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
     <Switch checked={node.isActive} disabled={pending} tabIndex={-1}
       aria-label={`${node.isActive ? 'Disable' : 'Enable'} ${node.name}`} onCheckedChange={(value) => onToggleActive(node, value)} />
-    <Button size="icon-sm" variant="ghost" tabIndex={-1} aria-label={`Edit ${node.name}`} title="Edit" disabled={pending}
-      className="size-7" onClick={() => onEdit(node)}>
-      <Pencil size={14} aria-hidden="true" />
-    </Button>
-    <Button size="icon-sm" variant="ghost" tabIndex={-1} aria-label={`Delete ${node.name}`} title="Delete" disabled={pending}
-      className="size-7" onClick={() => onDelete(node)}>
-      <Trash2 size={14} aria-hidden="true" />
-    </Button>
+    <Tip label="Edit">
+      <Button size="icon-sm" variant="ghost" tabIndex={-1} aria-label={`Edit ${node.name}`} disabled={pending}
+        className="size-7" onClick={() => onEdit(node)}>
+        <Pencil size={14} aria-hidden="true" />
+      </Button>
+    </Tip>
+    <Tip label="Delete">
+      <Button size="icon-sm" variant="ghost" tabIndex={-1} aria-label={`Delete ${node.name}`} disabled={pending}
+        className="size-7" onClick={() => onDelete(node)}>
+        <Trash2 size={14} aria-hidden="true" />
+      </Button>
+    </Tip>
   </div>;
 
   return <li ref={setNodeRef} style={style} role="treeitem" data-tree-id={node.id} aria-level={row.level} aria-setsize={row.siblings}
@@ -296,7 +301,7 @@ function SortableRow({ row, list, focused, projectedDepth, invalid, onFocusRow }
         : <span className="inline-block w-5 shrink-0" aria-hidden="true" />}
       <NodeIcon node={node} />
       <span className={cx('min-w-0 truncate text-sm', node.depth === 0 && 'font-semibold')}>{node.name}</span>
-      {!node.isActive && <Badge variant="warning" className="shrink-0">Inactive</Badge>}
+      {!node.isActive && <StatusBadge status="inactive" className="shrink-0">Inactive</StatusBadge>}
       <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums" title={rowCountLabel(node)} aria-hidden="true">
         {rowCount(node)}
       </span>
